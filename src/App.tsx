@@ -1028,7 +1028,7 @@ const App = () => {
     const projectBudget = budgets[project.firebaseId || project.id] ?? [];
     const total = projectBudget.reduce((acc, curr) => acc + curr.total, 0);
     const [selectedCategory, setSelectedCategory] = useState<string>(categories[0] || '');
-    const [selectedCatalogId, setSelectedCatalogId] = useState<number>(0);
+    const [selectedCatalogId, setSelectedCatalogId] = useState<number | string>(0);
     const [addQty, setAddQty] = useState<number>(1);
 
     const filteredCatalog = catalog.filter(i => i.category === selectedCategory);
@@ -1036,7 +1036,7 @@ const App = () => {
     // Update selected ID when category changes
     React.useEffect(() => {
         if (filteredCatalog.length > 0) {
-            setSelectedCatalogId(filteredCatalog[0].id);
+            setSelectedCatalogId(filteredCatalog[0].firebaseId || filteredCatalog[0].id);
         } else {
             setSelectedCatalogId(0);
         }
@@ -1126,13 +1126,13 @@ const App = () => {
                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">2. Concepto</label>
                      <select 
                         value={selectedCatalogId}
-                        onChange={(e) => setSelectedCatalogId(parseInt(e.target.value))}
+                        onChange={(e) => setSelectedCatalogId(e.target.value)}
                         disabled={filteredCatalog.length === 0}
                         className="w-full p-4 bg-white border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-100 transition-all font-bold text-sm h-[56px] appearance-none disabled:bg-slate-50 disabled:text-slate-400"
                      >
                         {filteredCatalog.length > 0 ? (
                             filteredCatalog.map(item => (
-                                <option key={item.id} value={item.id}>{item.concept} ({item.price}€/{item.unit})</option>
+                                <option key={item.firebaseId || item.id} value={item.firebaseId || item.id}>{item.concept} ({item.price}€/{item.unit})</option>
                             ))
                         ) : (
                             <option>No hay items en esta categoría</option>
