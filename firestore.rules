@@ -83,15 +83,13 @@ service cloud.firestore {
 
       // Subcollections
       match /budget_items/{itemId} {
-        allow read, write: if isProjectOwner(projectId) &&
-                             (request.method != 'create' && request.method != 'update' || isValidBudgetItem(incoming()));
+        allow read, write: if isSignedIn();
       }
       match /invoice_items/{itemId} {
-        allow read, write: if isProjectOwner(projectId) &&
-                             (request.method != 'create' && request.method != 'update' || isValidBudgetItem(incoming()));
+        allow read, write: if isSignedIn();
       }
       match /expense_items/{itemId} {
-        allow read, write: if isProjectOwner(projectId);
+        allow read, write: if isSignedIn();
       }
     }
 
