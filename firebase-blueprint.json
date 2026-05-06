@@ -1,0 +1,115 @@
+{
+  "entities": {
+    "Project": {
+      "title": "Project",
+      "description": "A renovation or construction work unit.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "clientName": { "type": "string" },
+        "clientCIF": { "type": "string" },
+        "clientAddress": { "type": "string" },
+        "clientEmail": { "type": "string" },
+        "clientPhone": { "type": "string" },
+        "status": { "type": "string", "enum": ["En curso", "Pendiente", "Finalizado"] },
+        "category": { "type": "string" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["name", "status", "ownerId"]
+    },
+    "CatalogItem": {
+      "title": "Catalog Item",
+      "description": "A reusable unit of work or material with price.",
+      "type": "object",
+      "properties": {
+        "category": { "type": "string" },
+        "concept": { "type": "string" },
+        "unit": { "type": "string" },
+        "price": { "type": "number" }
+      },
+      "required": ["concept", "unit", "price"]
+    },
+    "CalendarEvent": {
+      "title": "Calendar Event",
+      "description": "A task assigned to a worker for a specific project and date.",
+      "type": "object",
+      "properties": {
+        "projectId": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "worker": { "type": "string" },
+        "task": { "type": "string" },
+        "status": { "type": "string", "enum": ["pendiente", "urgente"] }
+      },
+      "required": ["projectId", "date", "task"]
+    },
+    "BudgetItem": {
+      "title": "Budget Item",
+      "description": "A line item in a project budget or invoice.",
+      "type": "object",
+      "properties": {
+        "concept": { "type": "string" },
+        "qty": { "type": "number" },
+        "unit": { "type": "string" },
+        "price": { "type": "number" },
+        "total": { "type": "number" }
+      },
+      "required": ["concept", "qty", "unit", "price", "total"]
+    },
+    "ExpenseItem": {
+      "title": "Expense Item",
+      "description": "A recorded expense for a project.",
+      "type": "object",
+      "properties": {
+        "concept": { "type": "string" },
+        "qty": { "type": "number" },
+        "unit": { "type": "string" },
+        "price": { "type": "number" },
+        "total": { "type": "number" },
+        "date": { "type": "string" },
+        "category": { "type": "string" },
+        "attachmentUrl": { "type": "string" }
+      },
+      "required": ["concept", "qty", "unit", "price", "total", "date", "category"]
+    },
+    "GlobalSettings": {
+      "title": "Global Settings",
+      "description": "Global application configuration labels.",
+      "type": "object",
+      "properties": {
+        "categories": { "type": "array", "items": { "type": "string" } },
+        "units": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "firestore": {
+    "/projects/{projectId}": {
+      "schema": "Project",
+      "description": "Work projects."
+    },
+    "/catalog/{itemId}": {
+      "schema": "CatalogItem",
+      "description": "Work concepts catalog."
+    },
+    "/calendar_events/{eventId}": {
+      "schema": "CalendarEvent",
+      "description": "Work schedule tasks."
+    },
+    "/settings/global": {
+      "schema": "GlobalSettings",
+      "description": "Application settings."
+    },
+    "/projects/{projectId}/budget_items/{itemId}": {
+      "schema": "BudgetItem",
+      "description": "Budget lines for a project."
+    },
+    "/projects/{projectId}/invoice_items/{itemId}": {
+      "schema": "BudgetItem",
+      "description": "Invoice lines for a project."
+    },
+    "/projects/{projectId}/expense_items/{itemId}": {
+      "schema": "ExpenseItem",
+      "description": "Expenses recorded for a project."
+    }
+  }
+}

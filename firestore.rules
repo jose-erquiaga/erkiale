@@ -1,0 +1,120 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- HELPERS ---
+    function isSignedIn() {
+      return request.auth != null && 
+             (request.auth.token.email == 'jose.erquiaga@gmail.com' || 
+              request.auth.token.email == 'Milnelas77@gmail.com');
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email == 'jose.erquiaga@gmail.com';
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isProjectOwner(projectId) {
+      let project = get(/databases/$(database)/documents/projects/$(projectId));
+      return project != null && isOwner(project.data.ownerId);
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- VALIDATORS ---
+    function isValidProject(data) {
+      return data.keys().hasAll(['name', 'status', 'ownerId']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
+             data.status in ['En curso', 'Pendiente', 'Finalizado'] &&
+             data.ownerId == request.auth.uid;
+    }
+
+    function isValidCatalogItem(data) {
+      return data.keys().hasAll(['concept', 'unit', 'price']) &&
+             data.concept is string && data.concept.size() > 0 && data.concept.size() <= 300 &&
+             data.unit is string && data.unit.size() > 0 &&
+             data.price is number &&
+             (!data.keys().hasAny(['category']) || data.category is string) &&
+             (!data.keys().hasAny(['id']) || data.id is number || data.id is string);
+    }
+
+    function isValidBudgetItem(data) {
+      return data.keys().hasAll(['concept', 'qty', 'unit', 'price', 'total']) &&
+             data.concept is string && data.concept.size() > 0 &&
+             data.qty is number &&
+             data.unit is string &&
+             data.price is number &&
+             data.total is number;
+    }
+
+    function isValidCalendarEvent(data) {
+      return data.keys().hasAll(['projectId', 'date', 'task']) &&
+             data.projectId is string &&
+             data.date is string &&
+             data.task is string && data.task.size() > 0 && data.task.size() <= 500;
+    }
+
+    // --- RULES ---
+    
+    match /projects/{projectId} {
+      allow get: if isOwner(existing().ownerId);
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() && isValidProject(incoming());
+      allow update: if isOwner(existing().ownerId) && isValidProject(incoming()) &&
+                      incoming().ownerId == existing().ownerId;
+      allow delete: if isOwner(existing().ownerId);
+
+      // Subcollections
+      match /budget_items/{itemId} {
+        allow read, write: if isProjectOwner(projectId) &&
+                             (request.method != 'create' && request.method != 'update' || isValidBudgetItem(incoming()));
+      }
+      match /invoice_items/{itemId} {
+        allow read, write: if isProjectOwner(projectId) &&
+                             (request.method != 'create' && request.method != 'update' || isValidBudgetItem(incoming()));
+      }
+      match /expense_items/{itemId} {
+        allow read, write: if isProjectOwner(projectId);
+      }
+    }
+
+    match /catalog/{itemId} {
+      // Catalog is shared/public read for signed in users, but only admins (or owners of item) can write?
+      // Assuming catalog is global but editable by anyone for now as per app UI
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && (request.method != 'create' && request.method != 'update' || isValidCatalogItem(incoming()));
+    }
+
+    match /calendar_events/{eventId} {
+      allow read: if isSignedIn(); // Broad read for calendar coordination
+      allow write: if isSignedIn() && (request.method != 'create' && request.method != 'update' || isValidCalendarEvent(incoming()));
+    }
+
+    match /settings/global {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // Explicitly allow creating the document if it doesn't exist
+    match /settings/{docId} {
+      allow read, write: if isSignedIn();
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "ERKIALE",
+  "description": "Gestión integral de obras y reformas: presupuestos, calendario y control de gastos.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": []
+}
