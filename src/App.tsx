@@ -628,7 +628,8 @@ const App = () => {
   const handleAddCatalogItem = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!isFirebaseConfigured) return;
-    const formData = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    const formData = new FormData(form);
     const newItem = {
       category: formData.get('category') as string,
       concept: formData.get('concept') as string,
@@ -638,7 +639,7 @@ const App = () => {
     };
     try {
       await addDoc(collection(db, 'catalog'), newItem);
-      e.currentTarget.reset();
+      form.reset();
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'catalog');
     }
@@ -790,7 +791,7 @@ const App = () => {
     }
   };
 
-  const selectedProject = projects.find(p => p.id === selectedProjectId) || projects[0];
+  const selectedProject = projects.find(p => p.firebaseId === selectedProjectId || p.id === selectedProjectId) || projects[0];
 
   // --- COMPONENTS ---
 
@@ -861,9 +862,9 @@ const App = () => {
           <select 
             className="bg-slate-800 text-[11px] font-bold w-full p-3 rounded-xl outline-none text-blue-400 cursor-pointer border border-slate-700 hover:border-blue-500/50 transition-colors appearance-none"
             value={selectedProjectId}
-            onChange={(e) => setSelectedProjectId(parseInt(e.target.value))}
+            onChange={(e) => setSelectedProjectId(e.target.value)}
           >
-            {projects.map(p => <option key={p.id} value={p.id} className="bg-[#0F172A] text-white py-2">{p.name}</option>)}
+            {projects.map(p => <option key={p.firebaseId || p.id} value={p.firebaseId || p.id} className="bg-[#0F172A] text-white py-2">{p.name}</option>)}
           </select>
           <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
             <ChevronRight size={14} className="rotate-90" />
@@ -881,12 +882,12 @@ const App = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: idx * 0.1 }}
-          onClick={() => setSelectedProjectId(project.id)}
-          className={`group bg-white rounded-[2.5rem] border transition-all duration-500 p-8 flex flex-col justify-between cursor-pointer hover:shadow-2xl hover:-translate-y-2 ${selectedProjectId === project.id ? 'border-blue-500 ring-4 ring-blue-50 shadow-blue-100/50' : 'border-slate-100 shadow-sm'}`}
+          onClick={() => setSelectedProjectId(project.firebaseId || project.id)}
+          className={`group bg-white rounded-[2.5rem] border transition-all duration-500 p-8 flex flex-col justify-between cursor-pointer hover:shadow-2xl hover:-translate-y-2 ${(selectedProjectId === project.firebaseId || selectedProjectId === project.id) ? 'border-blue-500 ring-4 ring-blue-50 shadow-blue-100/50' : 'border-slate-100 shadow-sm'}`}
         >
           <div>
             <div className="flex justify-between items-start mb-6">
-              <div className={`p-4 rounded-[1.5rem] transition-colors ${selectedProjectId === project.id ? 'bg-blue-600 text-white' : 'bg-slate-50 text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-500'}`}>
+              <div className={`p-4 rounded-[1.5rem] transition-colors ${(selectedProjectId === project.firebaseId || selectedProjectId === project.id) ? 'bg-blue-600 text-white' : 'bg-slate-50 text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-500'}`}>
                 <Briefcase size={28} />
               </div>
               <div className="flex flex-col items-end gap-2">
@@ -907,7 +908,7 @@ const App = () => {
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
-                    setDeleteConfirmation({ id: project.id, type: 'project', label: project.name });
+                    setDeleteConfirmation({ id: project.firebaseId || project.id, type: 'project', label: project.name });
                   }}
                   className="p-2 text-slate-300 hover:text-rose-500 transition-colors"
                 >
@@ -926,10 +927,10 @@ const App = () => {
             <button 
               onClick={(e) => {
                 e.stopPropagation();
-                setSelectedProjectId(project.id);
+                setSelectedProjectId(project.firebaseId || project.id);
                 setActiveTab('budgets');
               }}
-              className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all ${selectedProjectId === project.id ? 'text-blue-600' : 'text-slate-400 hover:text-blue-600'}`}
+              className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all ${(selectedProjectId === project.firebaseId || selectedProjectId === project.id) ? 'text-blue-600' : 'text-slate-400 hover:text-blue-600'}`}
             >
               Detalles <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
             </button>
@@ -2165,7 +2166,7 @@ const App = () => {
                                     <Hammer size={14}/>
                                   </button>
                                   <button 
-                                    onClick={(e) => { e.stopPropagation(); setDeleteConfirmation({ id: item.id, type: 'catalog', label: item.concept }); }} 
+                                    onClick={(e) => { e.stopPropagation(); setDeleteConfirmation({ id: item.firebaseId, type: 'catalog', label: item.concept }); }}
                                     className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors bg-rose-50/30"
                                     title="Eliminar Concepto"
                                   >
