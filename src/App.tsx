@@ -486,7 +486,7 @@ const App = () => {
     const formData = new FormData(e.currentTarget);
     const eventData = {
       id: editingEvent?.id || Date.now(),
-      projectId: editingEvent?.projectId || (addingEventDate ? (projects.find(p => p.firebaseId === selectedProjectId || p.id === selectedProjectId)?.id || 0) : projects[0]?.id),
+      projectId: String(selectedProjectId || projects[0]?.firebaseId || ''),
       firebaseProjectId: String(selectedProjectId),
       date: formData.get('date') as string,
       time: formData.get('time') as string,
@@ -1212,7 +1212,7 @@ const App = () => {
                             <Hammer size={14}/>
                           </button>
                           <button 
-                            onClick={(e) => { e.stopPropagation(); setDeleteConfirmation({ id: item.id, type: 'budget', label: item.concept }); }}
+                            onClick={(e) => { e.stopPropagation(); setDeleteConfirmation({ id: item.firebaseId, type: 'budget', label: item.concept }); }}
                             className="p-2 text-rose-500 hover:bg-rose-100 rounded-xl transition-colors bg-rose-50/50"
                             title="Eliminar Partida"
                           >
@@ -1310,7 +1310,7 @@ const App = () => {
                             <Hammer size={14}/>
                           </button>
                           <button 
-                            onClick={() => setDeleteConfirmation({ id: item.id, type: 'invoice', label: item.concept })}
+                            onClick={() => setDeleteConfirmation({ id: item.firebaseId, type: 'invoice', label: item.concept })}
                             className="p-2 text-rose-500 hover:bg-rose-100 rounded-xl transition-colors bg-rose-50/50"
                           >
                             <X size={14}/>
@@ -1445,7 +1445,7 @@ const App = () => {
                              <Hammer size={14} />
                            </button>
                            <button 
-                             onClick={() => setDeleteConfirmation({ id: exp.id, type: 'expense', label: exp.concept })} 
+                             onClick={() => setDeleteConfirmation({ id: exp.firebaseId, type: 'expense', label: exp.concept })} 
                              className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
                            >
                              <X size={14} />
@@ -1633,7 +1633,7 @@ const App = () => {
                     {editingEvent && (
                       <button 
                         type="button" 
-                        onClick={() => setDeleteConfirmation({ id: editingEvent.id, type: 'event', label: editingEvent.task })}
+                        onClick={() => setDeleteConfirmation({ id: editingEvent.firebaseId, type: 'event', label: editingEvent.task })}
                         className="flex-1 border border-rose-200 text-rose-500 p-5 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-rose-50 transition-all"
                       >
                         Eliminar
