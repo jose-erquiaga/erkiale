@@ -940,15 +940,15 @@ const App = () => {
     </div>
   );
 
-  const CalendarWidget = ({ projectId = null }: { projectId?: number | null }) => {
+  const CalendarWidget = ({ projectId = null }: { projectId?: string | number | null }) => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const firstDay = new Date(year, month, 1).getDay();
     const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
-    const filteredEvents = projectId 
-      ? events.filter(e => e.projectId === projectId)
+    const filteredEvents = projectId
+      ? events.filter(e => String(e.projectId) === String(projectId))
       : events;
 
     const cells = [];
@@ -1025,7 +1025,7 @@ const App = () => {
 
   const BudgetView = ({ project }: { project: Project }) => {
     if (!project) return <div className="p-12 text-center text-slate-400 italic">No hay ningún proyecto seleccionado.</div>;
-    const projectBudget = budgets[project.id] ?? [];
+    const projectBudget = budgets[project.firebaseId || project.id] ?? [];
     const total = projectBudget.reduce((acc, curr) => acc + curr.total, 0);
     const [selectedCategory, setSelectedCategory] = useState<string>(categories[0] || '');
     const [selectedCatalogId, setSelectedCatalogId] = useState<number>(0);
@@ -1246,7 +1246,7 @@ const App = () => {
 
   const BillingView = ({ project }: { project: Project }) => {
     if (!project) return <div className="p-12 text-center text-slate-400 italic">No hay ningún proyecto seleccionado.</div>;
-    const invoiceItems = invoices[project.id] ?? [];
+    const invoiceItems = invoices[project.firebaseId || project.id] ?? [];
     const total = invoiceItems.reduce((acc, curr) => acc + curr.total, 0);
 
     return (
@@ -1338,7 +1338,7 @@ const App = () => {
 
   const ExpensesView = ({ project }: { project: Project }) => {
     if (!project) return <div className="p-12 text-center text-slate-400 italic">No hay ningún proyecto seleccionado. Crea uno para empezar.</div>;
-    const projectExpenses = expenses[project.id] ?? [];
+    const projectExpenses = expenses[project.firebaseId || project.id] ?? [];
     const totalExpenses = projectExpenses.reduce((acc, curr) => acc + curr.total, 0);
     const [isScanning, setIsScanning] = useState(false);
     const [scanError, setScanError] = useState<string | null>(null);
