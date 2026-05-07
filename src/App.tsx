@@ -1026,7 +1026,13 @@ const App = () => {
   const BudgetView = ({ project }: { project: Project }) => {
     if (!project) return <div className="p-12 text-center text-slate-400 italic">No hay ningún proyecto seleccionado.</div>;
     const projectBudget = budgets[selectedProjectId] ?? [];
-    const total = projectBudget.reduce((acc, curr) => acc + curr.total, 0);
+    const projectExpensesForBudget = expenses[selectedProjectId] ?? [];
+    const totalPresupuesto = projectBudget.reduce((acc, curr) => acc + curr.total, 0);
+    const totalGastos = projectExpensesForBudget.reduce((acc, curr) => acc + curr.total, 0);
+    const margen = totalPresupuesto - totalGastos;
+    const pctEjecucion = totalPresupuesto > 0 ? Math.min((totalGastos / totalPresupuesto) * 100, 100) : 0;
+    const overBudget = totalGastos > totalPresupuesto;
+
     const [selectedCategory, setSelectedCategory] = useState<string>(categories[0] || '');
     const [selectedCatalogId, setSelectedCatalogId] = useState<string>('');
     const [addQty, setAddQty] = useState<number>(1);
@@ -1041,42 +1047,54 @@ const App = () => {
 
     return (
       <div className="space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-blue-600 p-10 rounded-[2.5rem] shadow-2xl shadow-blue-200 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-700">
-              <DollarSign size={120} />
-            </div>
+        {/* Financial summary: 3 cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Presupuesto */}
+          <div className="bg-blue-600 p-8 rounded-[2rem] shadow-2xl shadow-blue-200 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-6 opacity-10"><DollarSign size={90} /></div>
             <div className="relative z-10">
-              <p className="text-blue-100 text-[10px] font-black uppercase tracking-widest mb-2">Presupuesto Total Estimado</p>
-              <h3 className="text-5xl font-black text-white tracking-tighter">{total.toLocaleString()} €</h3>
-              <p className="text-blue-200 text-[10px] font-bold uppercase tracking-[0.2em] mt-4 flex items-center gap-2">
-                <CheckCircle2 size={12} /> Base Imponible (IVA no incl.)
-              </p>
+              <p className="text-blue-100 text-[10px] font-black uppercase tracking-widest mb-2">Presupuesto</p>
+              <p className="text-3xl font-black text-white tracking-tighter mb-1">{totalPresupuesto.toLocaleString('es-ES', {minimumFractionDigits:2})} €</p>
+              <p className="text-blue-200 text-[10px] font-bold uppercase tracking-wider">Base imponible · IVA: {(totalPresupuesto * 0.21).toLocaleString('es-ES', {minimumFractionDigits:2})} €</p>
+              <p className="text-blue-100 text-[10px] font-bold uppercase tracking-wider mt-1">Total c/IVA: {(totalPresupuesto * 1.21).toLocaleString('es-ES', {minimumFractionDigits:2})} €</p>
             </div>
           </div>
-          <div className="bg-slate-900 p-10 rounded-[2.5rem] shadow-2xl shadow-slate-200">
-             <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-6 px-1">Progreso Económico</p>
-             <div className="space-y-6">
-                <div>
-                  <div className="flex justify-between items-end mb-2">
-                    <span className="text-[10px] font-black text-white uppercase tracking-widest">Ejecución Presupuestaria</span>
-                    <span className="text-blue-400 text-sm font-bold">{(total > 0 ? (total / (total * 1.2) * 100).toFixed(0) : 0)}%</span>
-                  </div>
-                  <div className="h-3 w-full bg-slate-800 rounded-full overflow-hidden p-0.5">
-                    <div className="h-full bg-blue-500 rounded-full" style={{ width: `${total > 0 ? 45 : 0}%` }}></div>
-                  </div>
+
+          {/* Gastos reales */}
+          <div className="bg-slate-900 p-8 rounded-[2rem] shadow-2xl shadow-slate-200 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-6 opacity-10"><Receipt size={90} /></div>
+            <div className="relative z-10">
+              <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2">Gastos Ejecutados</p>
+              <p className={`text-3xl font-black tracking-tighter mb-1 ${overBudget ? 'text-rose-400' : 'text-white'}`}>{totalGastos.toLocaleString('es-ES', {minimumFractionDigits:2})} €</p>
+              <div className="mt-3">
+                <div className="flex justify-between text-[9px] font-bold text-slate-500 uppercase mb-1">
+                  <span>Ejecución del presupuesto</span>
+                  <span className={overBudget ? 'text-rose-400' : 'text-blue-400'}>{pctEjecucion.toFixed(1)}%</span>
                 </div>
-                <div className="flex gap-4">
-                  <div className="flex-1 p-4 rounded-3xl bg-slate-800/50 border border-slate-700">
-                    <p className="text-[9px] font-black text-slate-500 uppercase mb-1">Margen Estimado</p>
-                    <p className="text-lg font-black text-white">{(total * 0.25).toLocaleString()}€</p>
-                  </div>
-                  <div className="flex-1 p-4 rounded-3xl bg-slate-800/50 border border-slate-700">
-                    <p className="text-[9px] font-black text-slate-500 uppercase mb-1">IVA (21%)</p>
-                    <p className="text-lg font-black text-white">{(total * 0.21).toLocaleString()}€</p>
-                  </div>
+                <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${overBudget ? 'bg-rose-500' : 'bg-blue-500'}`}
+                    style={{ width: `${pctEjecucion}%` }}
+                  />
                 </div>
-             </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Margen */}
+          <div className={`p-8 rounded-[2rem] shadow-2xl relative overflow-hidden ${overBudget ? 'bg-rose-600 shadow-rose-200' : 'bg-emerald-600 shadow-emerald-200'}`}>
+            <div className="absolute top-0 right-0 p-6 opacity-10"><AlertCircle size={90} /></div>
+            <div className="relative z-10">
+              <p className={`text-[10px] font-black uppercase tracking-widest mb-2 ${overBudget ? 'text-rose-100' : 'text-emerald-100'}`}>{overBudget ? 'Desviación (sobre presupuesto)' : 'Margen Disponible'}</p>
+              <p className="text-3xl font-black text-white tracking-tighter mb-1">
+                {overBudget ? '-' : '+'}{Math.abs(margen).toLocaleString('es-ES', {minimumFractionDigits:2})} €
+              </p>
+              <p className={`text-[10px] font-bold uppercase tracking-wider mt-1 ${overBudget ? 'text-rose-200' : 'text-emerald-200'}`}>
+                {overBudget
+                  ? `Excedido en ${(totalGastos - totalPresupuesto).toLocaleString('es-ES', {minimumFractionDigits:2})} €`
+                  : `Quedan ${(totalPresupuesto > 0 ? (100 - pctEjecucion).toFixed(1) : '0')}% del presupuesto`}
+              </p>
+            </div>
           </div>
         </div>
 
