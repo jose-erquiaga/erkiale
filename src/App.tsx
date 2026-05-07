@@ -1024,7 +1024,7 @@ const App = () => {
 
   const BudgetView = ({ project }: { project: Project }) => {
     if (!project) return <div className="p-12 text-center text-slate-400 italic">No hay ningún proyecto seleccionado.</div>;
-    const projectBudget = budgets[project.firebaseId ?? String(project.id)] ?? [];
+    const projectBudget = budgets[selectedProjectId] ?? [];
     const total = projectBudget.reduce((acc, curr) => acc + curr.total, 0);
     const [selectedCategory, setSelectedCategory] = useState<string>(categories[0] || '');
     const [selectedCatalogId, setSelectedCatalogId] = useState<string>('');
@@ -1242,7 +1242,7 @@ const App = () => {
 
   const BillingView = ({ project }: { project: Project }) => {
     if (!project) return <div className="p-12 text-center text-slate-400 italic">No hay ningún proyecto seleccionado.</div>;
-    const invoiceItems = invoices[project.firebaseId ?? String(project.id)] ?? [];
+    const invoiceItems = invoices[selectedProjectId] ?? [];
     const total = invoiceItems.reduce((acc, curr) => acc + curr.total, 0);
 
     return (
@@ -1334,7 +1334,7 @@ const App = () => {
 
   const ExpensesView = ({ project }: { project: Project }) => {
     if (!project) return <div className="p-12 text-center text-slate-400 italic">No hay ningún proyecto seleccionado. Crea uno para empezar.</div>;
-    const projectExpenses = expenses[project.firebaseId ?? String(project.id)] ?? [];
+    const projectExpenses = expenses[selectedProjectId] ?? [];
     const totalExpenses = projectExpenses.reduce((acc, curr) => acc + curr.total, 0);
     const [isScanning, setIsScanning] = useState(false);
     const [scanError, setScanError] = useState<string | null>(null);
