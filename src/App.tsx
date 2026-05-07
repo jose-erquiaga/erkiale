@@ -242,6 +242,9 @@ const App = () => {
   const [isInvoiceVisible, setIsInvoiceVisible] = useState(false);
   const [isScanningCatalog, setIsScanningCatalog] = useState(false);
   const [catalogScanError, setCatalogScanError] = useState<string | null>(null);
+  const [scannedCatalogPreview, setScannedCatalogPreview] = useState<Array<{concept:string;category:string;unit:string;price:number}> | null>(null);
+  const [editingCatName, setEditingCatName] = useState<{old:string;val:string}|null>(null);
+  const [editingUnitName, setEditingUnitName] = useState<{old:string;val:string}|null>(null);
   const [editingInvoiceItem, setEditingInvoiceItem] = useState<BudgetItem | null>(null);
   const [editingExpenseItem, setEditingExpenseItem] = useState<ExpenseItem | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ id: any; type: string; label: string } | null>(null);
@@ -648,24 +651,31 @@ const App = () => {
   const handleCatalogScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
+    e.target.value = '';
     setIsScanningCatalog(true);
     setCatalogScanError(null);
-
     try {
       const items = await scanDocument(file, ScanType.CATALOG);
-      for (const item of items) {
-        await addDoc(collection(db, 'catalog'), {
-          ...item,
-          id: Date.now() + Math.random()
-        });
-      }
+      setScannedCatalogPreview(items.map((i: any) => ({
+        concept: i.concept || '',
+        category: i.category || categories[0] || '',
+        unit: i.unit || units[0] || '',
+        price: Number(i.price) || 0
+      })));
     } catch (error) {
       console.error("Catalog Scan Error:", error);
       setCatalogScanError("Error al escanear el catálogo. Verifica el archivo.");
     } finally {
       setIsScanningCatalog(false);
     }
+  };
+
+  const handleConfirmScannedCatalog = async () => {
+    if (!scannedCatalogPreview) return;
+    for (const item of scannedCatalogPreview) {
+      await addDoc(collection(db, 'catalog'), { ...item, id: Date.now() + Math.random() });
+    }
+    setScannedCatalogPreview(null);
   };
 
   const handleResetDatabase = async () => {
@@ -1783,6 +1793,79 @@ const App = () => {
         )}
       </AnimatePresence>
 
+      {/* MODAL: SCANNER CATALOG PREVIEW */}
+      <AnimatePresence>
+        {scannedCatalogPreview && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-[#0F172A]/80 backdrop-blur-md overflow-y-auto">
+            <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 30 }}
+              className="bg-white w-full max-w-4xl rounded-[2rem] shadow-2xl overflow-hidden">
+              <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center">
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Revisar Items Escaneados</h3>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{scannedCatalogPreview.length} ítems detectados — edita antes de guardar</p>
+                </div>
+                <button onClick={() => setScannedCatalogPreview(null)} className="p-2 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200"><X size={18}/></button>
+              </div>
+              <div className="overflow-x-auto max-h-[60vh] overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 border-b border-slate-100 sticky top-0">
+                    <tr>
+                      <th className="p-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Concepto</th>
+                      <th className="p-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Categoría</th>
+                      <th className="p-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Unidad</th>
+                      <th className="p-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Precio €</th>
+                      <th className="p-4"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {scannedCatalogPreview.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50/50">
+                        <td className="p-3">
+                          <input value={item.concept} onChange={e => setScannedCatalogPreview(prev => prev!.map((it, i) => i===idx ? {...it, concept: e.target.value} : it))}
+                            className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-blue-100"/>
+                        </td>
+                        <td className="p-3">
+                          <select value={item.category} onChange={e => setScannedCatalogPreview(prev => prev!.map((it, i) => i===idx ? {...it, category: e.target.value} : it))}
+                            className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-blue-100 appearance-none">
+                            {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                            {!categories.includes(item.category) && item.category && <option value={item.category}>{item.category} (nueva)</option>}
+                          </select>
+                        </td>
+                        <td className="p-3">
+                          <select value={item.unit} onChange={e => setScannedCatalogPreview(prev => prev!.map((it, i) => i===idx ? {...it, unit: e.target.value} : it))}
+                            className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-blue-100 appearance-none">
+                            {units.map(u => <option key={u} value={u}>{u}</option>)}
+                            {!units.includes(item.unit) && item.unit && <option value={item.unit}>{item.unit} (nueva)</option>}
+                          </select>
+                        </td>
+                        <td className="p-3">
+                          <input type="number" value={item.price} onChange={e => setScannedCatalogPreview(prev => prev!.map((it, i) => i===idx ? {...it, price: parseFloat(e.target.value)||0} : it))}
+                            className="w-24 p-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-blue-100 text-right"/>
+                        </td>
+                        <td className="p-3 text-center">
+                          <button onClick={() => setScannedCatalogPreview(prev => prev!.filter((_, i) => i !== idx))}
+                            className="p-1.5 text-rose-400 hover:bg-rose-50 rounded-lg transition-colors"><X size={14}/></button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="px-8 py-5 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/30">
+                <button onClick={() => setScannedCatalogPreview(null)}
+                  className="px-6 py-3 rounded-xl border border-slate-200 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-100 transition-all">
+                  Cancelar
+                </button>
+                <button onClick={handleConfirmScannedCatalog} disabled={scannedCatalogPreview.length === 0}
+                  className="px-8 py-3 rounded-xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 disabled:bg-slate-300">
+                  Guardar {scannedCatalogPreview.length} ítem{scannedCatalogPreview.length !== 1 ? 's' : ''} en Catálogo
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* MODAL: INVOICE VIEW */}
       <AnimatePresence>
         {isInvoiceVisible && (
@@ -2110,36 +2193,46 @@ const App = () => {
                                 <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Gestionar Categorías</h4>
                                 <div className="flex flex-wrap gap-2">
                                   {categories.map(cat => (
-                                    <div key={cat} className="group flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-white transition-colors">
-                                      <span className="text-[11px] font-bold text-slate-700">{cat}</span>
-                                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button 
-                                          onClick={() => {
-                                            const newName = prompt(`Editar categoría "${cat}":`, cat);
-                                            if (newName && newName.trim() !== cat && !categories.includes(newName.trim())) {
-                                              const trimmedNewName = newName.trim();
-                                              const newCats = categories.map(c => c === cat ? trimmedNewName : c);
-                                              setDoc(doc(db, 'settings', 'global'), { 
-                                                categories: newCats, 
-                                                units: units.length > 0 ? units : ['m2', 'ml', 'ud', 'litros', 'm3', 'kg'] 
-                                              }, { merge: true })
-                                              .catch(err => handleFirestoreError(err, OperationType.WRITE, 'settings/global'));
-                                              
-                                              // Update items in catalog that used this category
-                                              catalog.forEach(item => {
-                                                if (item.category === cat && item.firebaseId) {
-                                                  updateDoc(doc(db, 'catalog', item.firebaseId), { category: trimmedNewName })
-                                                  .catch(err => console.error("Error updating catalog item category:", err));
+                                    <div key={cat} className="flex items-center gap-1 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
+                                      {editingCatName?.old === cat ? (
+                                        <>
+                                          <input autoFocus value={editingCatName.val}
+                                            onChange={e => setEditingCatName({old: cat, val: e.target.value})}
+                                            onKeyDown={e => {
+                                              if (e.key === 'Enter') {
+                                                const v = editingCatName.val.trim();
+                                                if (v && v !== cat && !categories.includes(v)) {
+                                                  const newCats = categories.map(c => c === cat ? v : c);
+                                                  setDoc(doc(db, 'settings', 'global'), { categories: newCats, units }, { merge: true })
+                                                    .catch(err => handleFirestoreError(err, OperationType.WRITE, 'settings/global'));
+                                                  catalog.filter(i => i.category === cat && i.firebaseId).forEach(i =>
+                                                    updateDoc(doc(db, 'catalog', i.firebaseId!), { category: v }).catch(() => {}));
                                                 }
-                                              });
+                                                setEditingCatName(null);
+                                              }
+                                              if (e.key === 'Escape') setEditingCatName(null);
+                                            }}
+                                            className="text-[11px] font-bold bg-white border border-blue-300 rounded-lg px-2 py-0.5 outline-none w-24"/>
+                                          <button onClick={() => {
+                                            const v = editingCatName.val.trim();
+                                            if (v && v !== cat && !categories.includes(v)) {
+                                              const newCats = categories.map(c => c === cat ? v : c);
+                                              setDoc(doc(db, 'settings', 'global'), { categories: newCats, units }, { merge: true })
+                                                .catch(err => handleFirestoreError(err, OperationType.WRITE, 'settings/global'));
+                                              catalog.filter(i => i.category === cat && i.firebaseId).forEach(i =>
+                                                updateDoc(doc(db, 'catalog', i.firebaseId!), { category: v }).catch(() => {}));
                                             }
-                                          }} 
-                                          className="p-1 text-blue-500 hover:bg-blue-50 rounded-lg"
-                                        >
-                                          <Hammer size={10}/>
-                                        </button>
-                                        <button onClick={() => setDeleteConfirmation({ id: cat, type: 'category', label: cat })} className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg"><X size={10}/></button>
-                                      </div>
+                                            setEditingCatName(null);
+                                          }} className="p-1 text-emerald-500 hover:bg-emerald-50 rounded-lg"><CheckCircle2 size={10}/></button>
+                                          <button onClick={() => setEditingCatName(null)} className="p-1 text-slate-400 hover:bg-slate-200 rounded-lg"><X size={10}/></button>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <span className="text-[11px] font-bold text-slate-700">{cat}</span>
+                                          <button onClick={() => setEditingCatName({old: cat, val: cat})} className="p-1 text-blue-500 hover:bg-blue-50 rounded-lg ml-1"><Hammer size={10}/></button>
+                                          <button onClick={() => setDeleteConfirmation({ id: cat, type: 'category', label: cat })} className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg"><X size={10}/></button>
+                                        </>
+                                      )}
                                     </div>
                                   ))}
                                 </div>
@@ -2148,36 +2241,46 @@ const App = () => {
                                 <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Gestionar Unidades</h4>
                                 <div className="flex flex-wrap gap-2">
                                   {units.map(u => (
-                                    <div key={u} className="group flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-white transition-colors">
-                                      <span className="text-[11px] font-bold text-slate-700">{u}</span>
-                                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button 
-                                          onClick={() => {
-                                            const newUnit = prompt(`Editar unidad "${u}":`, u);
-                                            if (newUnit && newUnit.trim() !== u && !units.includes(newUnit.trim())) {
-                                              const trimmedNewUnit = newUnit.trim();
-                                              const newUnits = units.map(unit => unit === u ? trimmedNewUnit : unit);
-                                              setDoc(doc(db, 'settings', 'global'), { 
-                                                categories: categories.length > 0 ? categories : ['Pintura', 'Escayola', 'Suelos', 'Baños', 'Cocinas', 'Fontanería', 'Electricidad'], 
-                                                units: newUnits 
-                                              }, { merge: true })
-                                              .catch(err => handleFirestoreError(err, OperationType.WRITE, 'settings/global'));
-                                              
-                                              // Update items in catalog that used this unit
-                                              catalog.forEach(item => {
-                                                if (item.unit === u && item.firebaseId) {
-                                                  updateDoc(doc(db, 'catalog', item.firebaseId), { unit: trimmedNewUnit })
-                                                  .catch(err => console.error("Error updating catalog item unit:", err));
+                                    <div key={u} className="flex items-center gap-1 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
+                                      {editingUnitName?.old === u ? (
+                                        <>
+                                          <input autoFocus value={editingUnitName.val}
+                                            onChange={e => setEditingUnitName({old: u, val: e.target.value})}
+                                            onKeyDown={e => {
+                                              if (e.key === 'Enter') {
+                                                const v = editingUnitName.val.trim();
+                                                if (v && v !== u && !units.includes(v)) {
+                                                  const newUnits = units.map(un => un === u ? v : un);
+                                                  setDoc(doc(db, 'settings', 'global'), { categories, units: newUnits }, { merge: true })
+                                                    .catch(err => handleFirestoreError(err, OperationType.WRITE, 'settings/global'));
+                                                  catalog.filter(i => i.unit === u && i.firebaseId).forEach(i =>
+                                                    updateDoc(doc(db, 'catalog', i.firebaseId!), { unit: v }).catch(() => {}));
                                                 }
-                                              });
+                                                setEditingUnitName(null);
+                                              }
+                                              if (e.key === 'Escape') setEditingUnitName(null);
+                                            }}
+                                            className="text-[11px] font-bold bg-white border border-blue-300 rounded-lg px-2 py-0.5 outline-none w-24"/>
+                                          <button onClick={() => {
+                                            const v = editingUnitName.val.trim();
+                                            if (v && v !== u && !units.includes(v)) {
+                                              const newUnits = units.map(un => un === u ? v : un);
+                                              setDoc(doc(db, 'settings', 'global'), { categories, units: newUnits }, { merge: true })
+                                                .catch(err => handleFirestoreError(err, OperationType.WRITE, 'settings/global'));
+                                              catalog.filter(i => i.unit === u && i.firebaseId).forEach(i =>
+                                                updateDoc(doc(db, 'catalog', i.firebaseId!), { unit: v }).catch(() => {}));
                                             }
-                                          }} 
-                                          className="p-1 text-blue-500 hover:bg-blue-50 rounded-lg"
-                                        >
-                                          <Hammer size={10}/>
-                                        </button>
-                                        <button onClick={() => setDeleteConfirmation({ id: u, type: 'unit', label: u })} className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg"><X size={10}/></button>
-                                      </div>
+                                            setEditingUnitName(null);
+                                          }} className="p-1 text-emerald-500 hover:bg-emerald-50 rounded-lg"><CheckCircle2 size={10}/></button>
+                                          <button onClick={() => setEditingUnitName(null)} className="p-1 text-slate-400 hover:bg-slate-200 rounded-lg"><X size={10}/></button>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <span className="text-[11px] font-bold text-slate-700">{u}</span>
+                                          <button onClick={() => setEditingUnitName({old: u, val: u})} className="p-1 text-blue-500 hover:bg-blue-50 rounded-lg ml-1"><Hammer size={10}/></button>
+                                          <button onClick={() => setDeleteConfirmation({ id: u, type: 'unit', label: u })} className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg"><X size={10}/></button>
+                                        </>
+                                      )}
                                     </div>
                                   ))}
                                 </div>
