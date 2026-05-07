@@ -486,7 +486,7 @@ const App = () => {
     const formData = new FormData(e.currentTarget);
     const eventData = {
       id: editingEvent?.id || Date.now(),
-      projectId: String(selectedProjectId || projects[0]?.firebaseId || ''),
+      projectId: editingEvent?.projectId || (addingEventDate ? (projects.find(p => p.firebaseId === selectedProjectId || p.id === selectedProjectId)?.id || 0) : projects[0]?.id),
       firebaseProjectId: String(selectedProjectId),
       date: formData.get('date') as string,
       time: formData.get('time') as string,
@@ -791,7 +791,7 @@ const App = () => {
     }
   };
 
-  const selectedProject = projects.find(p => p.firebaseId === selectedProjectId || p.id === selectedProjectId) || projects[0];
+  const selectedProject = projects.find(p => p.id === selectedProjectId) || projects[0];
 
   // --- COMPONENTS ---
 
@@ -862,9 +862,9 @@ const App = () => {
           <select 
             className="bg-slate-800 text-[11px] font-bold w-full p-3 rounded-xl outline-none text-blue-400 cursor-pointer border border-slate-700 hover:border-blue-500/50 transition-colors appearance-none"
             value={selectedProjectId}
-            onChange={(e) => setSelectedProjectId(e.target.value)}
+            onChange={(e) => setSelectedProjectId(parseInt(e.target.value))}
           >
-            {projects.map(p => <option key={p.firebaseId || p.id} value={p.firebaseId || p.id} className="bg-[#0F172A] text-white py-2">{p.name}</option>)}
+            {projects.map(p => <option key={p.id} value={p.id} className="bg-[#0F172A] text-white py-2">{p.name}</option>)}
           </select>
           <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
             <ChevronRight size={14} className="rotate-90" />
@@ -882,12 +882,12 @@ const App = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: idx * 0.1 }}
-          onClick={() => setSelectedProjectId(project.firebaseId || project.id)}
-          className={`group bg-white rounded-[2.5rem] border transition-all duration-500 p-8 flex flex-col justify-between cursor-pointer hover:shadow-2xl hover:-translate-y-2 ${(selectedProjectId === project.firebaseId || selectedProjectId === project.id) ? 'border-blue-500 ring-4 ring-blue-50 shadow-blue-100/50' : 'border-slate-100 shadow-sm'}`}
+          onClick={() => setSelectedProjectId(project.id)}
+          className={`group bg-white rounded-[2.5rem] border transition-all duration-500 p-8 flex flex-col justify-between cursor-pointer hover:shadow-2xl hover:-translate-y-2 ${selectedProjectId === project.id ? 'border-blue-500 ring-4 ring-blue-50 shadow-blue-100/50' : 'border-slate-100 shadow-sm'}`}
         >
           <div>
             <div className="flex justify-between items-start mb-6">
-              <div className={`p-4 rounded-[1.5rem] transition-colors ${(selectedProjectId === project.firebaseId || selectedProjectId === project.id) ? 'bg-blue-600 text-white' : 'bg-slate-50 text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-500'}`}>
+              <div className={`p-4 rounded-[1.5rem] transition-colors ${selectedProjectId === project.id ? 'bg-blue-600 text-white' : 'bg-slate-50 text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-500'}`}>
                 <Briefcase size={28} />
               </div>
               <div className="flex flex-col items-end gap-2">
@@ -908,7 +908,7 @@ const App = () => {
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
-                    setDeleteConfirmation({ id: project.firebaseId || project.id, type: 'project', label: project.name });
+                    setDeleteConfirmation({ id: project.id, type: 'project', label: project.name });
                   }}
                   className="p-2 text-slate-300 hover:text-rose-500 transition-colors"
                 >
@@ -927,10 +927,10 @@ const App = () => {
             <button 
               onClick={(e) => {
                 e.stopPropagation();
-                setSelectedProjectId(project.firebaseId || project.id);
+                setSelectedProjectId(project.id);
                 setActiveTab('budgets');
               }}
-              className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all ${(selectedProjectId === project.firebaseId || selectedProjectId === project.id) ? 'text-blue-600' : 'text-slate-400 hover:text-blue-600'}`}
+              className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all ${selectedProjectId === project.id ? 'text-blue-600' : 'text-slate-400 hover:text-blue-600'}`}
             >
               Detalles <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
             </button>
@@ -940,7 +940,7 @@ const App = () => {
     </div>
   );
 
-  const CalendarWidget = ({ projectId = null }: { projectId?: string | number | null }) => {
+  const CalendarWidget = ({ projectId = null }: { projectId?: number | null }) => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -948,7 +948,7 @@ const App = () => {
     const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
     const filteredEvents = projectId
-      ? events.filter(e => String(e.projectId) === String(projectId))
+      ? events.filter(e => e.projectId === projectId)
       : events;
 
     const cells = [];
@@ -1025,10 +1025,10 @@ const App = () => {
 
   const BudgetView = ({ project }: { project: Project }) => {
     if (!project) return <div className="p-12 text-center text-slate-400 italic">No hay ningún proyecto seleccionado.</div>;
-    const projectBudget = budgets[project.firebaseId || project.id] ?? [];
+    const projectBudget = budgets[project.id] ?? [];
     const total = projectBudget.reduce((acc, curr) => acc + curr.total, 0);
     const [selectedCategory, setSelectedCategory] = useState<string>(categories[0] || '');
-    const [selectedCatalogId, setSelectedCatalogId] = useState<number | string>(0);
+    const [selectedCatalogId, setSelectedCatalogId] = useState<number>(0);
     const [addQty, setAddQty] = useState<number>(1);
 
     const filteredCatalog = catalog.filter(i => i.category === selectedCategory);
@@ -1036,7 +1036,7 @@ const App = () => {
     // Update selected ID when category changes
     React.useEffect(() => {
         if (filteredCatalog.length > 0) {
-            setSelectedCatalogId(filteredCatalog[0].firebaseId || filteredCatalog[0].id);
+            setSelectedCatalogId(filteredCatalog[0].id);
         } else {
             setSelectedCatalogId(0);
         }
@@ -1126,13 +1126,13 @@ const App = () => {
                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">2. Concepto</label>
                      <select 
                         value={selectedCatalogId}
-                        onChange={(e) => setSelectedCatalogId(e.target.value)}
+                        onChange={(e) => setSelectedCatalogId(parseInt(e.target.value))}
                         disabled={filteredCatalog.length === 0}
                         className="w-full p-4 bg-white border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-100 transition-all font-bold text-sm h-[56px] appearance-none disabled:bg-slate-50 disabled:text-slate-400"
                      >
                         {filteredCatalog.length > 0 ? (
                             filteredCatalog.map(item => (
-                                <option key={item.firebaseId || item.id} value={item.firebaseId || item.id}>{item.concept} ({item.price}€/{item.unit})</option>
+                                <option key={item.id} value={item.id}>{item.concept} ({item.price}€/{item.unit})</option>
                             ))
                         ) : (
                             <option>No hay items en esta categoría</option>
@@ -1246,7 +1246,7 @@ const App = () => {
 
   const BillingView = ({ project }: { project: Project }) => {
     if (!project) return <div className="p-12 text-center text-slate-400 italic">No hay ningún proyecto seleccionado.</div>;
-    const invoiceItems = invoices[project.firebaseId || project.id] ?? [];
+    const invoiceItems = invoices[project.id] ?? [];
     const total = invoiceItems.reduce((acc, curr) => acc + curr.total, 0);
 
     return (
@@ -1338,7 +1338,7 @@ const App = () => {
 
   const ExpensesView = ({ project }: { project: Project }) => {
     if (!project) return <div className="p-12 text-center text-slate-400 italic">No hay ningún proyecto seleccionado. Crea uno para empezar.</div>;
-    const projectExpenses = expenses[project.firebaseId || project.id] ?? [];
+    const projectExpenses = expenses[project.id] ?? [];
     const totalExpenses = projectExpenses.reduce((acc, curr) => acc + curr.total, 0);
     const [isScanning, setIsScanning] = useState(false);
     const [scanError, setScanError] = useState<string | null>(null);
