@@ -1650,7 +1650,7 @@ const App = () => {
                     {editingEvent && (
                       <button 
                         type="button" 
-                        onClick={() => setDeleteConfirmation({ id: editingEvent.firebaseId, type: 'event', label: editingEvent.task })}
+                        onClick={() => { setDeleteConfirmation({ id: editingEvent.firebaseId, type: 'event', label: editingEvent.task }); setEditingEvent(null); }}
                         className="flex-1 border border-rose-200 text-rose-500 p-5 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-rose-50 transition-all"
                       >
                         Eliminar
