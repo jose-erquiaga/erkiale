@@ -459,7 +459,8 @@ const App = () => {
 
   const handleSaveExpense = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    const formData = new FormData(form);
     const qty = parseFloat(formData.get('qty') as string) || 0;
     const price = parseFloat(formData.get('price') as string) || 0;
     const data = {
@@ -475,7 +476,7 @@ const App = () => {
 
     try {
       await addDoc(collection(db, 'projects', String(selectedProjectId), 'expense_items'), data);
-      e.currentTarget.reset();
+      form.reset();
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, `projects/${selectedProjectId}/expense_items`);
     }
@@ -525,8 +526,8 @@ const App = () => {
     }
   };
 
-  const handleAddBudgetItem = async (catalogItemId: number | string, qty: number) => {
-    const catalogItem = catalog.find(item => item.firebaseId === catalogItemId || item.id === catalogItemId);
+  const handleAddBudgetItem = async (catalogItemId: string, qty: number) => {
+    const catalogItem = catalog.find(item => item.firebaseId === catalogItemId);
     if (!catalogItem) return;
 
     const newItem = {
@@ -1026,19 +1027,15 @@ const App = () => {
     const projectBudget = budgets[project.firebaseId ?? String(project.id)] ?? [];
     const total = projectBudget.reduce((acc, curr) => acc + curr.total, 0);
     const [selectedCategory, setSelectedCategory] = useState<string>(categories[0] || '');
-    const [selectedCatalogId, setSelectedCatalogId] = useState<number>(0);
+    const [selectedCatalogId, setSelectedCatalogId] = useState<string>('');
     const [addQty, setAddQty] = useState<number>(1);
 
     const filteredCatalog = catalog.filter(i => i.category === selectedCategory);
 
-    // Update selected ID when category or catalog changes (catalog loads async from Firestore)
+    // Update selected item when category or catalog changes (catalog loads async from Firestore)
     React.useEffect(() => {
         const filtered = catalog.filter(i => i.category === selectedCategory);
-        if (filtered.length > 0) {
-            setSelectedCatalogId(filtered[0].id);
-        } else {
-            setSelectedCatalogId(0);
-        }
+        setSelectedCatalogId(filtered.length > 0 ? (filtered[0].firebaseId || '') : '');
     }, [selectedCategory, catalog]);
 
     return (
@@ -1125,13 +1122,13 @@ const App = () => {
                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">2. Concepto</label>
                      <select 
                         value={selectedCatalogId}
-                        onChange={(e) => setSelectedCatalogId(parseInt(e.target.value))}
+                        onChange={(e) => setSelectedCatalogId(e.target.value)}
                         disabled={filteredCatalog.length === 0}
                         className="w-full p-4 bg-white border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-100 transition-all font-bold text-sm h-[56px] appearance-none disabled:bg-slate-50 disabled:text-slate-400"
                      >
                         {filteredCatalog.length > 0 ? (
                             filteredCatalog.map(item => (
-                                <option key={item.id} value={item.id}>{item.concept} ({item.price}€/{item.unit})</option>
+                                <option key={item.firebaseId} value={item.firebaseId}>{item.concept} ({item.price}€/{item.unit})</option>
                             ))
                         ) : (
                             <option>No hay items en esta categoría</option>
@@ -1150,7 +1147,7 @@ const App = () => {
                    <div className="md:col-span-3">
                      <button 
                         onClick={() => handleAddBudgetItem(selectedCatalogId, addQty)}
-                        disabled={selectedCatalogId === 0}
+                        disabled={!selectedCatalogId}
                         className="w-full bg-blue-600 text-white p-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 h-[56px] disabled:bg-slate-300 disabled:shadow-none"
                      >
                        Añadir Partida
