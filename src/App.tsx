@@ -215,7 +215,7 @@ const App = () => {
 
   // --- STATE ---
   const [activeTab, setActiveTab] = useState('dashboard'); 
-  const [selectedProjectId, setSelectedProjectId] = useState<number | string>(0);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [projectSubTab, setProjectSubTab] = useState<'budget' | 'calendar'>('budget');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -286,8 +286,8 @@ const App = () => {
     const projectsUnsubscribe = onSnapshot(projectsQuery, (snapshot) => {
       const projectsList = snapshot.docs.map(doc => ({ ...doc.data(), firebaseId: doc.id } as Project));
       setProjects(projectsList);
-      if (projectsList.length > 0 && (selectedProjectId === 0 || !projectsList.map(p => p.firebaseId || p.id).includes(selectedProjectId))) {
-        setSelectedProjectId(projectsList[0].firebaseId || projectsList[0].id);
+      if (projectsList.length > 0 && (selectedProjectId === '' || !projectsList.map(p => p.firebaseId).includes(selectedProjectId))) {
+        setSelectedProjectId(projectsList[0].firebaseId || '');
       }
     }, (error) => handleFirestoreError(error, OperationType.LIST, pathProjects));
 
@@ -308,13 +308,13 @@ const App = () => {
   // Load project-specific data when selected project changes
   useEffect(() => {
     // CRITICAL: Don't listen for subcollections if no project is selected or if it's the initial "0"
-    if (!user || !selectedProjectId || selectedProjectId === 0) return;
+    if (!user || !selectedProjectId) return;
 
     const projectIdStr = String(selectedProjectId);
     
-    // Safety check: ensure project actually exists in projects list or is a valid string ID
-    const projectExists = projects.some(p => (p.firebaseId || p.id) === selectedProjectId);
-    if (!projectExists && typeof selectedProjectId === 'number') return;
+    // Safety check: ensure project actually exists in projects list
+    const projectExists = projects.some(p => p.firebaseId === selectedProjectId);
+    if (!projectExists) return;
 
     const pathBudget = `projects/${projectIdStr}/budget_items`;
     // Budget items
@@ -486,7 +486,7 @@ const App = () => {
     const formData = new FormData(e.currentTarget);
     const eventData = {
       id: editingEvent?.id || Date.now(),
-      projectId: editingEvent?.projectId || (addingEventDate ? (projects.find(p => p.firebaseId === selectedProjectId || p.id === selectedProjectId)?.id || 0) : projects[0]?.id),
+      projectId: editingEvent?.projectId || (addingEventDate ? selectedProjectId : (projects[0]?.firebaseId || '')),
       firebaseProjectId: String(selectedProjectId),
       date: formData.get('date') as string,
       time: formData.get('time') as string,
@@ -555,10 +555,8 @@ const App = () => {
         const projectIdStr = String(id);
         await deleteDoc(doc(db, 'projects', projectIdStr));
         if (selectedProjectId === id) {
-          const remainingProjects = projects.filter(p => (p.firebaseId || p.id) !== id);
-          if (remainingProjects.length > 0) {
-            setSelectedProjectId(remainingProjects[0].firebaseId || remainingProjects[0].id);
-          }
+          const remainingProjects = projects.filter(p => p.firebaseId !== id);
+          setSelectedProjectId(remainingProjects.length > 0 ? (remainingProjects[0].firebaseId || '') : '');
         }
       } else if (type === 'budget') {
         await deleteDoc(doc(db, 'projects', String(selectedProjectId), 'budget_items', String(id)));
@@ -791,7 +789,7 @@ const App = () => {
     }
   };
 
-  const selectedProject = projects.find(p => p.id === selectedProjectId) || projects[0];
+  const selectedProject = projects.find(p => p.firebaseId === selectedProjectId) || projects[0];
 
   // --- COMPONENTS ---
 
@@ -862,9 +860,9 @@ const App = () => {
           <select 
             className="bg-slate-800 text-[11px] font-bold w-full p-3 rounded-xl outline-none text-blue-400 cursor-pointer border border-slate-700 hover:border-blue-500/50 transition-colors appearance-none"
             value={selectedProjectId}
-            onChange={(e) => setSelectedProjectId(parseInt(e.target.value))}
+            onChange={(e) => setSelectedProjectId(e.target.value)}
           >
-            {projects.map(p => <option key={p.id} value={p.id} className="bg-[#0F172A] text-white py-2">{p.name}</option>)}
+            {projects.map(p => <option key={p.firebaseId} value={p.firebaseId} className="bg-[#0F172A] text-white py-2">{p.name}</option>)}
           </select>
           <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
             <ChevronRight size={14} className="rotate-90" />
@@ -908,7 +906,7 @@ const App = () => {
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
-                    setDeleteConfirmation({ id: project.id, type: 'project', label: project.name });
+                    setDeleteConfirmation({ id: project.firebaseId, type: 'project', label: project.name });
                   }}
                   className="p-2 text-slate-300 hover:text-rose-500 transition-colors"
                 >
@@ -940,7 +938,7 @@ const App = () => {
     </div>
   );
 
-  const CalendarWidget = ({ projectId = null }: { projectId?: number | null }) => {
+  const CalendarWidget = ({ projectId = null }: { projectId?: string | null }) => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -1025,7 +1023,7 @@ const App = () => {
 
   const BudgetView = ({ project }: { project: Project }) => {
     if (!project) return <div className="p-12 text-center text-slate-400 italic">No hay ningún proyecto seleccionado.</div>;
-    const projectBudget = budgets[project.id] ?? [];
+    const projectBudget = budgets[project.firebaseId ?? String(project.id)] ?? [];
     const total = projectBudget.reduce((acc, curr) => acc + curr.total, 0);
     const [selectedCategory, setSelectedCategory] = useState<string>(categories[0] || '');
     const [selectedCatalogId, setSelectedCatalogId] = useState<number>(0);
@@ -1033,14 +1031,15 @@ const App = () => {
 
     const filteredCatalog = catalog.filter(i => i.category === selectedCategory);
 
-    // Update selected ID when category changes
+    // Update selected ID when category or catalog changes (catalog loads async from Firestore)
     React.useEffect(() => {
-        if (filteredCatalog.length > 0) {
-            setSelectedCatalogId(filteredCatalog[0].id);
+        const filtered = catalog.filter(i => i.category === selectedCategory);
+        if (filtered.length > 0) {
+            setSelectedCatalogId(filtered[0].id);
         } else {
             setSelectedCatalogId(0);
         }
-    }, [selectedCategory]);
+    }, [selectedCategory, catalog]);
 
     return (
       <div className="space-y-8">
@@ -1246,7 +1245,7 @@ const App = () => {
 
   const BillingView = ({ project }: { project: Project }) => {
     if (!project) return <div className="p-12 text-center text-slate-400 italic">No hay ningún proyecto seleccionado.</div>;
-    const invoiceItems = invoices[project.id] ?? [];
+    const invoiceItems = invoices[project.firebaseId ?? String(project.id)] ?? [];
     const total = invoiceItems.reduce((acc, curr) => acc + curr.total, 0);
 
     return (
@@ -1338,7 +1337,7 @@ const App = () => {
 
   const ExpensesView = ({ project }: { project: Project }) => {
     if (!project) return <div className="p-12 text-center text-slate-400 italic">No hay ningún proyecto seleccionado. Crea uno para empezar.</div>;
-    const projectExpenses = expenses[project.id] ?? [];
+    const projectExpenses = expenses[project.firebaseId ?? String(project.id)] ?? [];
     const totalExpenses = projectExpenses.reduce((acc, curr) => acc + curr.total, 0);
     const [isScanning, setIsScanning] = useState(false);
     const [scanError, setScanError] = useState<string | null>(null);
