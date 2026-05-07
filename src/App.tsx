@@ -664,7 +664,12 @@ const App = () => {
       })));
     } catch (error) {
       console.error("Catalog Scan Error:", error);
-      setCatalogScanError("Error al escanear el catálogo. Verifica el archivo.");
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes('429') || msg.toLowerCase().includes('quota')) {
+        setCatalogScanError("Cuota de IA agotada. Has superado el límite gratuito de Gemini. Espera un momento o revisa tu plan en ai.google.dev.");
+      } else {
+        setCatalogScanError("Error al escanear. Verifica que el archivo sea una imagen o PDF legible.");
+      }
     } finally {
       setIsScanningCatalog(false);
     }
@@ -2179,6 +2184,15 @@ const App = () => {
                           )}
                        </div>
                      </div>
+
+                     {catalogScanError && (
+                       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                         className="flex items-start gap-3 bg-rose-50 border border-rose-200 rounded-2xl px-5 py-4 mb-6 text-rose-700 text-[11px] font-bold">
+                         <AlertCircle size={16} className="shrink-0 mt-0.5 text-rose-500" />
+                         <span>{catalogScanError}</span>
+                         <button onClick={() => setCatalogScanError(null)} className="ml-auto text-rose-400 hover:text-rose-600"><X size={14}/></button>
+                       </motion.div>
+                     )}
 
                      <AnimatePresence>
                        {isManagingLists && (
