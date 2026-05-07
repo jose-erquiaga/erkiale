@@ -1810,7 +1810,7 @@ const App = () => {
                 const docNum = String(selectedProject?.id || 0).slice(-4);
                 const docDate = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
                 return (
-                <div id="invoice-content" className="p-12 print:p-0 text-slate-900 bg-white min-h-[29.7cm] font-sans">
+                <div id="invoice-content" className="p-12 text-slate-900 bg-white min-h-[29.7cm] font-sans">
 
                   {/* Header: Logo + Company */}
                   <div className="flex justify-between items-start mb-8">
@@ -2410,11 +2410,30 @@ const App = () => {
 
       <style>{`
         @media print {
-          .print\:hidden { display: none !important; }
-          main { margin-left: 0 !important; padding: 0 !important; max-width: none !important; }
-          #invoice-content { padding: 0 !important; }
-          body { background: white !important; }
-          nav, header, aside, .no-print { display: none !important; }
+          /* Hide everything on the page */
+          body * { visibility: hidden; }
+
+          /* Show only the invoice content and all its children */
+          #invoice-content, #invoice-content * { visibility: visible; }
+
+          /* Pin it to the top-left of the page with proper margins */
+          #invoice-content {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            min-height: 100% !important;
+            padding: 14mm 16mm !important;
+            margin: 0 !important;
+            background: white !important;
+            box-shadow: none !important;
+          }
+
+          /* Ensure page size and margins */
+          @page {
+            size: A4 portrait;
+            margin: 0;
+          }
         }
         .custom-scrollbar::-webkit-scrollbar {
           width: 4px;
