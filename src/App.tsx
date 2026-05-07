@@ -1791,7 +1791,17 @@ const App = () => {
               <div className="p-8 border-b flex justify-between items-center sticky top-0 bg-white/80 backdrop-blur z-20 print:hidden md:rounded-t-[2.5rem]">
                 <h3 className="text-sm font-black uppercase tracking-widest">Vista Previa de Factura</h3>
                 <div className="flex gap-2">
-                  <button onClick={() => window.print()} className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase flex items-center gap-2 shadow-lg shadow-blue-100">
+                  <button onClick={() => {
+                    const content = document.getElementById('invoice-content');
+                    if (!content) return;
+                    const pw = window.open('', '_blank', 'width=900,height=700');
+                    if (!pw) return;
+                    pw.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Erkiale</title>
+                    <script src="https://cdn.tailwindcss.com"></script>
+                    <style>@page{size:A4 portrait;margin:12mm 14mm;}body{font-family:sans-serif;background:white;}</style>
+                    </head><body>${content.outerHTML}<script>window.onload=function(){setTimeout(function(){window.print();},1200);};<\/script></body></html>`);
+                    pw.document.close();
+                  }} className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase flex items-center gap-2 shadow-lg shadow-blue-100">
                     <FileText size={14}/> Imprimir / PDF
                   </button>
                   <button onClick={() => setIsInvoiceVisible(false)} className="p-2.5 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200 transition-all">
@@ -2410,30 +2420,8 @@ const App = () => {
 
       <style>{`
         @media print {
-          /* Hide everything on the page */
-          body * { visibility: hidden; }
-
-          /* Show only the invoice content and all its children */
-          #invoice-content, #invoice-content * { visibility: visible; }
-
-          /* Pin it to the top-left of the page with proper margins */
-          #invoice-content {
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
-            min-height: 100% !important;
-            padding: 14mm 16mm !important;
-            margin: 0 !important;
-            background: white !important;
-            box-shadow: none !important;
-          }
-
-          /* Ensure page size and margins */
-          @page {
-            size: A4 portrait;
-            margin: 0;
-          }
+          .print\:hidden { display: none !important; }
+          body { background: white !important; }
         }
         .custom-scrollbar::-webkit-scrollbar {
           width: 4px;
