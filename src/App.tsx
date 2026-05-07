@@ -209,6 +209,17 @@ interface ExpenseItem {
   attachmentUrl?: string;
 }
 
+const PROJECT_COLORS = [
+  '#3B82F6', // blue
+  '#10B981', // emerald
+  '#F59E0B', // amber
+  '#EF4444', // red
+  '#8B5CF6', // purple
+  '#EC4899', // pink
+  '#06B6D4', // cyan
+  '#F97316', // orange
+];
+
 const App = () => {
   // --- AUTH STATE ---
   const [user, setUser] = useState<FirebaseUser | null>(null);
@@ -808,18 +819,67 @@ const App = () => {
 
   const selectedProject = projects.find(p => p.firebaseId === selectedProjectId) || projects[0];
 
+  const selectedProjectIndex = projects.findIndex(p => p.firebaseId === selectedProjectId);
+  const activeColor = PROJECT_COLORS[(selectedProjectIndex >= 0 ? selectedProjectIndex : 0) % PROJECT_COLORS.length];
+
+  const getProjectColor = (projFirebaseId: string) => {
+    const idx = projects.findIndex(p => p.firebaseId === projFirebaseId || String(p.id) === projFirebaseId);
+    return PROJECT_COLORS[(idx >= 0 ? idx : 0) % PROJECT_COLORS.length];
+  };
+
   // --- COMPONENTS ---
 
   const Sidebar = () => (
     <div className="w-64 bg-[#0F172A] h-screen text-white flex flex-col fixed left-0 top-0 z-50 shadow-2xl overflow-y-auto border-r border-slate-800">
-      <div className="p-8 border-b border-slate-800 flex flex-col gap-1">
+      {/* Logo */}
+      <div className="p-6 pb-4 border-b border-slate-800 flex flex-col gap-1">
         <h1 className="text-2xl font-black flex items-center gap-2 tracking-tight text-white italic">
-          <Hammer className="text-blue-500 fill-blue-500/20" size={28} /> ERKIALE<span className="text-blue-500"> S.L</span>
+          <Hammer size={24} style={{color: activeColor}} /> ERKIALE<span style={{color: activeColor}}> S.L</span>
         </h1>
-        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em] mt-1">Gestión de Obras</p>
+        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em]">Gestión de Obras</p>
       </div>
-      
-      <nav className="flex-1 p-4 space-y-1 mt-4">
+
+      {/* Project selector — top */}
+      <div className="px-4 pt-4 pb-2">
+        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 px-1">Proyecto activo</p>
+        <div className="relative rounded-2xl overflow-hidden" style={{boxShadow: `0 0 0 2px ${activeColor}50`}}>
+          <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl" style={{background: activeColor}} />
+          <select
+            className="bg-slate-900 text-[11px] font-black w-full pl-4 pr-8 py-3.5 outline-none cursor-pointer appearance-none transition-colors"
+            style={{color: activeColor}}
+            value={selectedProjectId}
+            onChange={(e) => setSelectedProjectId(e.target.value)}
+          >
+            {projects.map((p, i) => (
+              <option key={p.firebaseId} value={p.firebaseId} className="bg-[#0F172A] text-white">{p.name}</option>
+            ))}
+          </select>
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{color: activeColor}}>
+            <ChevronRight size={13} className="rotate-90" />
+          </div>
+        </div>
+        {/* Color dots — one per project */}
+        {projects.length > 1 && (
+          <div className="flex gap-1.5 mt-2 px-1">
+            {projects.map((p, i) => (
+              <button
+                key={p.firebaseId}
+                title={p.name}
+                onClick={() => setSelectedProjectId(p.firebaseId || '')}
+                className="w-2.5 h-2.5 rounded-full transition-all"
+                style={{
+                  background: PROJECT_COLORS[i % PROJECT_COLORS.length],
+                  opacity: p.firebaseId === selectedProjectId ? 1 : 0.35,
+                  transform: p.firebaseId === selectedProjectId ? 'scale(1.4)' : 'scale(1)'
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 p-4 space-y-1 mt-2">
         {[
           { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
           { id: 'projects', label: 'Proyectos', icon: Briefcase },
@@ -829,12 +889,13 @@ const App = () => {
           { id: 'billing', label: 'Facturación', icon: Receipt },
           { id: 'expenses', label: 'Gastos', icon: Ticket },
         ].map(item => (
-          <button 
+          <button
             key={item.id}
             onClick={() => setActiveTab(item.id)}
-            className={`w-full flex items-center gap-3 p-3.5 rounded-2xl transition-all duration-300 text-sm font-semibold group ${activeTab === item.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30 ring-1 ring-white/10' : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}
+            className={`w-full flex items-center gap-3 p-3.5 rounded-2xl transition-all duration-300 text-sm font-semibold group ${activeTab === item.id ? 'text-white ring-1 ring-white/10' : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}
+            style={activeTab === item.id ? {backgroundColor: activeColor, boxShadow: `0 4px 20px ${activeColor}50`} : {}}
           >
-            <item.icon size={18} className={`${activeTab === item.id ? 'text-white' : 'text-slate-500 group-hover:text-blue-400 transition-colors'}`} />
+            <item.icon size={18} className={activeTab === item.id ? 'text-white' : 'text-slate-500 group-hover:text-white transition-colors'} />
             {item.label}
           </button>
         ))}
@@ -842,9 +903,9 @@ const App = () => {
         <div className="pt-8 mt-8 border-t border-slate-800 px-4">
           <div className="flex items-center gap-3 mb-6">
             {user.photoURL ? (
-              <img src={user.photoURL} alt={user.displayName || ''} className="w-10 h-10 rounded-full border-2 border-blue-500/30" referrerPolicy="no-referrer" />
+              <img src={user.photoURL} alt={user.displayName || ''} className="w-10 h-10 rounded-full border-2 border-slate-700" referrerPolicy="no-referrer" />
             ) : (
-              <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-blue-500">
+              <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center" style={{color: activeColor}}>
                 <User size={20} />
               </div>
             )}
@@ -853,15 +914,14 @@ const App = () => {
               <p className="text-[9px] font-bold text-slate-500 truncate">{user.email}</p>
             </div>
           </div>
-          <button 
+          <button
             onClick={handleLogout}
             className="w-full flex items-center gap-3 p-3 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-400/10 transition-all text-[10px] font-black uppercase tracking-widest"
           >
             <LogOut size={16} /> Cerrar Sesión
           </button>
-
           {isAdmin() && (
-            <button 
+            <button
               onClick={handleResetDatabase}
               className="w-full mt-2 flex items-center gap-3 p-3 rounded-xl text-slate-600 hover:text-white hover:bg-slate-800 transition-all text-[9px] font-black uppercase tracking-widest"
             >
@@ -870,22 +930,6 @@ const App = () => {
           )}
         </div>
       </nav>
-
-      <div className="p-4 bg-slate-900 m-4 rounded-3xl border border-slate-800 shadow-inner">
-        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-3 px-1">Fijar Contexto:</p>
-        <div className="relative group">
-          <select 
-            className="bg-slate-800 text-[11px] font-bold w-full p-3 rounded-xl outline-none text-blue-400 cursor-pointer border border-slate-700 hover:border-blue-500/50 transition-colors appearance-none"
-            value={selectedProjectId}
-            onChange={(e) => setSelectedProjectId(e.target.value)}
-          >
-            {projects.map(p => <option key={p.firebaseId} value={p.firebaseId} className="bg-[#0F172A] text-white py-2">{p.name}</option>)}
-          </select>
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
-            <ChevronRight size={14} className="rotate-90" />
-          </div>
-        </div>
-      </div>
     </div>
   );
 
@@ -981,36 +1025,48 @@ const App = () => {
           onDragOver={handleDragOver}
           onDrop={(e) => handleDrop(e, dateStr)}
           onClick={() => setAddingEventDate(dateStr)}
-          className="h-32 border border-slate-100 p-2 hover:bg-blue-50/30 transition-all relative group cursor-pointer"
+          className="h-32 border border-slate-100 p-2 hover:bg-slate-50/60 transition-all relative group cursor-pointer"
         >
           <div className="flex justify-between items-center mb-1">
-            <span className={`text-[10px] font-black ${new Date().toISOString().split('T')[0] === dateStr ? 'bg-blue-600 text-white w-5 h-5 flex items-center justify-center rounded-full' : 'text-slate-300 group-hover:text-blue-600'}`}>{d}</span>
-            <Plus size={10} className="text-slate-200 group-hover:text-blue-400" />
+            {new Date().toISOString().split('T')[0] === dateStr ? (
+              <span className="text-[10px] font-black text-white w-5 h-5 flex items-center justify-center rounded-full" style={{background: activeColor}}>{d}</span>
+            ) : (
+              <span className="text-[10px] font-black text-slate-300 group-hover:text-slate-600">{d}</span>
+            )}
+            <Plus size={10} className="text-slate-200 group-hover:text-slate-400" />
           </div>
           <div className="space-y-1 overflow-y-auto max-h-[80px] custom-scrollbar">
-            {dayEvents.map(ev => (
-              <motion.div 
-                key={ev.id} 
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData('text/plain', ev.id.toString());
-                  e.dataTransfer.effectAllowed = 'move';
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setEditingEvent(ev);
-                }}
-                initial={{ scale: 0.95 }}
-                animate={{ scale: 1 }}
-                className={`text-[8px] p-1.5 rounded-lg truncate shadow-sm font-bold border-l-2 cursor-grab active:cursor-grabbing ${ev.status === 'urgente' ? 'bg-rose-50 text-rose-700 border-rose-500' : 'bg-blue-50 text-blue-700 border-blue-500'}`}
-              >
-                <div className="flex justify-between items-center mb-0.5 pointer-events-none">
-                  <span className="truncate flex-1">{ev.worker}</span>
-                  <span className="opacity-60 ml-1 shrink-0">{ev.time}</span>
-                </div>
-                <div className="opacity-90 truncate pointer-events-none">{ev.task}</div>
-              </motion.div>
-            ))}
+            {dayEvents.map(ev => {
+              const evColor = getProjectColor(String(ev.projectId));
+              return (
+                <motion.div
+                  key={ev.id}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData('text/plain', ev.id.toString());
+                    e.dataTransfer.effectAllowed = 'move';
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditingEvent(ev);
+                  }}
+                  initial={{ scale: 0.95 }}
+                  animate={{ scale: 1 }}
+                  className="text-[8px] p-1.5 rounded-lg truncate shadow-sm font-bold border-l-2 cursor-grab active:cursor-grabbing"
+                  style={{
+                    backgroundColor: `${evColor}18`,
+                    color: evColor,
+                    borderLeftColor: ev.status === 'urgente' ? '#EF4444' : evColor,
+                  }}
+                >
+                  <div className="flex justify-between items-center mb-0.5 pointer-events-none">
+                    <span className="truncate flex-1">{ev.worker}</span>
+                    <span className="opacity-60 ml-1 shrink-0">{ev.time}</span>
+                  </div>
+                  <div className="opacity-90 truncate pointer-events-none">{ev.task}</div>
+                </motion.div>
+              );
+            })}
           </div>
         </div>
       );
@@ -2076,11 +2132,17 @@ const App = () => {
               {activeTab === 'expenses' && "Tickets y Gastos"}
               {activeTab === 'projects' && "Listado Proyectos"}
             </h1>
-            <div className="flex items-center gap-3">
-                <div className="h-1 w-12 bg-blue-500 rounded-full"></div>
+            <div className="flex items-center gap-3 flex-wrap">
+                <div className="h-1 w-12 rounded-full" style={{background: activeColor}}></div>
                 <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.2em]">
-                  {activeTab === 'budgets' ? `Control financiero: ${selectedProject?.name}` : "Sistema de Gestión ERKIALE"}
+                  Sistema de Gestión ERKIALE
                 </p>
+                {selectedProject && (
+                  <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest" style={{background: `${activeColor}18`, color: activeColor}}>
+                    <span className="w-1.5 h-1.5 rounded-full" style={{background: activeColor}} />
+                    {selectedProject.name}
+                  </span>
+                )}
             </div>
           </motion.div>
           
