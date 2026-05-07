@@ -189,6 +189,7 @@ interface BudgetItem {
   id: number;
   firebaseId?: string;
   concept: string;
+  description?: string;
   qty: number;
   unit: string;
   price: number;
@@ -1781,98 +1782,134 @@ const App = () => {
                 </div>
               </div>
               
-              <div id="invoice-content" className="p-12 print:p-0 text-slate-900 bg-white min-h-[29.7cm]">
-                <div className="flex justify-between items-start mb-16">
-                  <div className="w-32 h-20 bg-slate-100 flex items-center justify-center rounded-sm border border-slate-200">
-                    <span className="text-3xl font-black italic text-slate-400">EK</span>
-                  </div>
-                  <div className="text-right text-[11px] leading-relaxed font-medium text-slate-600">
-                    <h2 className="text-sm font-black text-slate-900 mb-1">ERKIALE S.L</h2>
-                    <p>B92898287</p>
-                    <p>Avda Julio Iglesias 3</p>
-                    <p>29660 Nueva Andalucia, Málaga, España</p>
-                    <p>Telf. 647462631</p>
-                  </div>
-                </div>
+              {(() => {
+                const isInvoice = activeTab === 'billing';
+                const docItems = (isInvoice ? invoices : budgets)[selectedProjectId] || [];
+                const baseImponible = docItems.reduce((acc, curr) => acc + curr.total, 0);
+                const iva = baseImponible * 0.21;
+                const total = baseImponible * 1.21;
+                const docYear = new Date().getFullYear();
+                const docNum = String(selectedProject?.id || 0).slice(-4);
+                const docDate = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                return (
+                <div id="invoice-content" className="p-12 print:p-0 text-slate-900 bg-white min-h-[29.7cm] font-sans">
 
-                <div className="grid grid-cols-2 gap-12 mb-16 border-t border-slate-100 pt-8">
-                   <div>
-                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Cliente</p>
-                     <h3 className="text-sm font-black text-slate-900 mb-1 uppercase">{selectedProject?.clientName}</h3>
-                     <div className="text-[11px] space-y-0.5 font-medium text-slate-600">
-                      <p>{selectedProject?.clientCIF}</p>
-                      <p className="max-w-[200px]">{selectedProject?.clientAddress}</p>
-                      <p className="lowercase">{selectedProject?.clientEmail}</p>
-                     </div>
-                   </div>
-                   <div className="text-right md:text-left">
-                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">{activeTab === 'billing' ? 'Factura' : 'Presupuesto'}</p>
-                     <div className="grid grid-cols-2 gap-x-8 gap-y-2">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">Nº de {activeTab === 'billing' ? 'factura' : 'presupuesto'}</span>
-                        <span className="text-xs font-black text-right">{new Date().getFullYear()}/{selectedProjectId}</span>
-                        
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">Fecha</span>
-                        <span className="text-xs font-black text-right">{new Date().toLocaleDateString('es-ES')}</span>
-                     </div>
-                   </div>
-                </div>
+                  {/* Header: Logo + Company */}
+                  <div className="flex justify-between items-start mb-8">
+                    {/* Logo placeholder styled like the real EH logo */}
+                    <div className="w-28 h-20 border-2 border-slate-700 flex items-center justify-center relative">
+                      <div className="absolute inset-1 border border-slate-400 flex items-center justify-center">
+                        <span className="text-2xl font-black text-slate-700 tracking-tighter italic">EH</span>
+                      </div>
+                    </div>
+                    <div className="text-right text-[11px] leading-relaxed text-slate-700">
+                      <p className="text-sm font-bold text-slate-900 mb-0.5">Erkiale S.L</p>
+                      <p>B92898287</p>
+                      <p>Avda Julio Iglesias 3</p>
+                      <p>29660 Nueva Andalucia, Málaga, España</p>
+                      <p>Telf. 647462631</p>
+                    </div>
+                  </div>
 
-                <div className="mb-8">
-                  <table className="w-full">
-                    <thead className="border-b border-slate-200">
-                      <tr>
-                        <th className="py-3 text-left text-[9px] font-black uppercase tracking-widest text-slate-400">Conceptos</th>
-                        <th className="py-3 text-right text-[9px] font-black uppercase tracking-widest text-slate-400 w-16">Cant.</th>
-                        <th className="py-3 text-right text-[9px] font-black uppercase tracking-widest text-slate-400 w-24">Precio uni.</th>
-                        <th className="py-3 text-right text-[9px] font-black uppercase tracking-widest text-slate-400 w-16">Imp.</th>
-                        <th className="py-3 text-right text-[9px] font-black uppercase tracking-widest text-slate-400 w-24">Total</th>
+                  {/* Thin separator */}
+                  <div className="border-t border-slate-300 mb-8" />
+
+                  {/* Cliente + Factura/Presupuesto */}
+                  <div className="grid grid-cols-2 gap-12 mb-8">
+                    <div>
+                      <p className="text-sm font-bold text-slate-900 mb-3 uppercase">Cliente</p>
+                      <p className="text-[12px] font-black text-slate-900 uppercase mb-1">{selectedProject?.clientName || '—'}</p>
+                      <div className="text-[11px] leading-snug text-slate-700 space-y-0.5">
+                        <p>{selectedProject?.clientCIF || ''}</p>
+                        <p>{selectedProject?.clientAddress || ''}</p>
+                        {selectedProject?.clientEmail && <p className="lowercase">{selectedProject.clientEmail}</p>}
+                        {selectedProject?.clientPhone && <p>{selectedProject.clientPhone}</p>}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-slate-900 mb-3 uppercase">{isInvoice ? 'Factura' : 'Presupuesto'}</p>
+                      <table className="text-[11px] w-full">
+                        <tbody>
+                          <tr>
+                            <td className="text-slate-600 py-0.5 pr-4">Nº de {isInvoice ? 'factura' : 'presupuesto'}</td>
+                            <td className="font-bold text-right">{docYear}/{docNum}</td>
+                          </tr>
+                          <tr>
+                            <td className="text-slate-600 py-0.5 pr-4">Fecha {isInvoice ? 'factura' : 'presupuesto'}</td>
+                            <td className="font-bold text-right">{docDate}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Blue separator line */}
+                  <div className="h-0.5 bg-blue-500 mb-0" />
+
+                  {/* Items table */}
+                  <table className="w-full text-[11px] mb-8">
+                    <thead>
+                      <tr className="border-b border-slate-200">
+                        <th className="py-3 text-left font-semibold text-slate-600">Conceptos</th>
+                        <th className="py-3 text-right font-semibold text-slate-600 w-16">Cant.</th>
+                        <th className="py-3 text-right font-semibold text-slate-600 w-28">Precio uni.</th>
+                        <th className="py-3 text-right font-semibold text-slate-600 w-16">Imp.</th>
+                        <th className="py-3 text-right font-semibold text-slate-600 w-28">Total</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {((activeTab === 'billing' ? invoices : budgets)[selectedProjectId] || []).map(item => (
-                        <tr key={item.id}>
-                          <td className="py-4 text-[11px] font-bold text-slate-800 leading-tight">
-                            {item.concept}
+                    <tbody>
+                      {docItems.map(item => (
+                        <tr key={item.id} className="border-b border-slate-100">
+                          <td className="py-4 pr-4">
+                            <p className="font-bold text-slate-900 uppercase">{item.concept}</p>
+                            {item.description && (
+                              <p className="text-[10px] text-slate-600 mt-1 leading-snug whitespace-pre-line">{item.description}</p>
+                            )}
                           </td>
-                          <td className="py-4 text-right text-[11px] font-medium text-slate-500">{item.qty.toFixed(2)}</td>
-                          <td className="py-4 text-right text-[11px] font-medium text-slate-500">{item.price.toFixed(2)} €</td>
-                          <td className="py-4 text-right text-[11px] font-medium text-slate-500">21%</td>
-                          <td className="py-4 text-right text-[11px] font-black text-slate-900">{item.total.toFixed(2)} €</td>
+                          <td className="py-4 text-right text-slate-700">{item.qty.toFixed(2)}</td>
+                          <td className="py-4 text-right text-slate-700">{item.price.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
+                          <td className="py-4 text-right text-slate-700">21%</td>
+                          <td className="py-4 text-right font-bold text-slate-900">{(item.price * item.qty * 1.21).toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                </div>
 
-                <div className="flex justify-end pt-8 border-t-2 border-blue-500/10">
-                  <div className="w-64 space-y-2">
-                    <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase">
-                       <span>Base Imponible</span>
-                       <span className="text-slate-900">{((activeTab === 'billing' ? invoices : budgets)[selectedProjectId] || []).reduce((acc, curr) => acc + curr.total, 0).toFixed(2)} €</span>
-                    </div>
-                    <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase pb-2 border-b border-slate-100">
-                       <span>IVA 21%</span>
-                       <span className="text-slate-900">{(((activeTab === 'billing' ? invoices : budgets)[selectedProjectId] || []).reduce((acc, curr) => acc + curr.total, 0) * 0.21).toFixed(2)} €</span>
-                    </div>
-                    <div className="flex justify-between items-center pt-2">
-                       <span className="text-xs font-black uppercase tracking-widest">Total</span>
-                       <span className="text-xl font-black text-slate-900">{(((activeTab === 'billing' ? invoices : budgets)[selectedProjectId] || []).reduce((acc, curr) => acc + curr.total, 0) * 1.21).toFixed(2)} €</span>
+                  {/* Blue separator line */}
+                  <div className="h-0.5 bg-blue-500 mb-6" />
+
+                  {/* Totals */}
+                  <div className="flex justify-end mb-12">
+                    <div className="w-72 text-[12px] space-y-1.5">
+                      <div className="flex justify-between">
+                        <span className="text-slate-600">Base Imponible</span>
+                        <span className="font-medium">{baseImponible.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</span>
+                      </div>
+                      <div className="flex justify-between pb-2 border-b border-slate-200">
+                        <span className="text-slate-600">IVA 21%</span>
+                        <span className="font-medium">{iva.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</span>
+                      </div>
+                      <div className="flex justify-between pt-1">
+                        <span className="font-bold text-slate-900">Total</span>
+                        <span className="font-bold text-slate-900">{total.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-                
-                <div className="mt-auto pt-20">
-                  <div className="bg-slate-50 p-6 rounded-xl">
-                    <h4 className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">Métodos de pago</h4>
-                    <p className="text-[11px] font-medium text-slate-600">Transferencia bancaria al número de cuenta <span className="font-bold text-slate-900">ES38 0182 1078 8602 0152 6785</span></p>
+
+                  {/* Payment methods */}
+                  <div className="mb-12 text-[11px]">
+                    <p className="font-semibold text-slate-700 mb-1">Métodos de pago</p>
+                    <p className="text-slate-600">Transferencia bancaria al número de cuenta <span className="font-bold text-slate-900">ES38 0182 1078 8602 0152 6785</span></p>
                   </div>
-                  
-                  <div className="mt-12 flex justify-between items-center text-[9px] text-slate-300 font-bold uppercase tracking-widest">
+
+                  {/* Footer */}
+                  <div className="flex justify-between items-center text-[10px] text-slate-400 border-t border-slate-100 pt-4">
                     <span>B92898287</span>
                     <span>1 / 1</span>
                   </div>
                 </div>
-              </div>
+                );
+              })()}
             </motion.div>
           </div>
         )}
