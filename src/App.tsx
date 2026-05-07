@@ -935,36 +935,49 @@ const App = () => {
 
   const ProjectsView = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-      {projects.map((project, idx) => (
-        <motion.div 
-          key={project.id} 
+      {projects.map((project, idx) => {
+        const projColor = PROJECT_COLORS[idx % PROJECT_COLORS.length];
+        const isSelected = selectedProjectId === project.firebaseId;
+        return (
+        <motion.div
+          key={project.id}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: idx * 0.1 }}
-          onClick={() => setSelectedProjectId(project.id)}
-          className={`group bg-white rounded-[2.5rem] border transition-all duration-500 p-8 flex flex-col justify-between cursor-pointer hover:shadow-2xl hover:-translate-y-2 ${selectedProjectId === project.id ? 'border-blue-500 ring-4 ring-blue-50 shadow-blue-100/50' : 'border-slate-100 shadow-sm'}`}
+          onClick={() => setSelectedProjectId(project.firebaseId || '')}
+          className="group bg-white rounded-[2.5rem] border transition-all duration-500 p-8 flex flex-col justify-between cursor-pointer hover:shadow-2xl hover:-translate-y-2"
+          style={{
+            borderColor: isSelected ? projColor : '#f1f5f9',
+            boxShadow: isSelected ? `0 0 0 4px ${projColor}20, 0 20px 40px ${projColor}15` : undefined,
+          }}
         >
           <div>
             <div className="flex justify-between items-start mb-6">
-              <div className={`p-4 rounded-[1.5rem] transition-colors ${selectedProjectId === project.id ? 'bg-blue-600 text-white' : 'bg-slate-50 text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-500'}`}>
+              <div
+                className="p-4 rounded-[1.5rem] transition-colors"
+                style={{
+                  backgroundColor: isSelected ? projColor : `${projColor}15`,
+                  color: isSelected ? 'white' : projColor,
+                }}
+              >
                 <Briefcase size={28} />
               </div>
               <div className="flex flex-col items-end gap-2">
-                <select 
+                <select
                   value={project.status}
                   onClick={(e) => e.stopPropagation()}
                   onChange={(e) => handleUpdateProjectStatus(project.id, e.target.value as any)}
                   className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full ring-1 outline-none cursor-pointer appearance-none text-center ${
-                    project.status === 'En curso' ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : 
-                    project.status === 'Pendiente' ? 'bg-blue-50 text-blue-700 ring-blue-100' : 
-                    'bg-slate-50 text-slate-600 ring-slate-100'
+                    project.status === 'En curso' ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' :
+                    project.status === 'Pendiente' ? 'bg-slate-50 text-slate-600 ring-slate-100' :
+                    'bg-slate-50 text-slate-400 ring-slate-100'
                   }`}
                 >
                   <option value="Pendiente">Pendiente</option>
                   <option value="En curso">En curso</option>
                   <option value="Finalizado">Finalizado</option>
                 </select>
-                <button 
+                <button
                   onClick={(e) => {
                     e.stopPropagation();
                     setDeleteConfirmation({ id: project.firebaseId, type: 'project', label: project.name });
@@ -975,27 +988,37 @@ const App = () => {
                 </button>
               </div>
             </div>
-            <h3 className="text-2xl font-black text-slate-900 mb-2 leading-tight group-hover:text-blue-600 transition-colors">{project.name}</h3>
+            <h3
+              className="text-2xl font-black text-slate-900 mb-2 leading-tight transition-colors"
+              style={isSelected ? {color: projColor} : {}}
+            >
+              {project.name}
+            </h3>
             <div className="flex items-center gap-2 text-slate-500 text-sm font-medium mb-8">
               <User size={14} /> {project.clientName}
             </div>
           </div>
-          
+
           <div className="pt-8 border-t border-slate-50 flex items-center justify-between mt-auto">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">{project.category}</span>
-            <button 
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full" style={{background: projColor}} />
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">{project.category}</span>
+            </div>
+            <button
               onClick={(e) => {
                 e.stopPropagation();
-                setSelectedProjectId(project.id);
+                setSelectedProjectId(project.firebaseId || '');
                 setActiveTab('budgets');
               }}
-              className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all ${selectedProjectId === project.id ? 'text-blue-600' : 'text-slate-400 hover:text-blue-600'}`}
+              className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all"
+              style={{color: projColor}}
             >
               Detalles <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
             </button>
           </div>
         </motion.div>
-      ))}
+        );
+      })}
     </div>
   );
 
@@ -2147,11 +2170,16 @@ const App = () => {
           </motion.div>
           
           {(activeTab === 'projects' || activeTab === 'dashboard') && (
-            <motion.button 
+            <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => setIsModalOpen(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-10 py-5 rounded-[1.75rem] font-black uppercase text-[10px] tracking-[0.2em] shadow-2xl shadow-blue-200 border-b-4 border-blue-800 flex items-center gap-3 transition-all"
+              className="text-white px-10 py-5 rounded-[1.75rem] font-black uppercase text-[10px] tracking-[0.2em] flex items-center gap-3 transition-all"
+              style={{
+                background: activeColor,
+                boxShadow: `0 8px 30px ${activeColor}50`,
+                borderBottom: `4px solid ${activeColor}cc`
+              }}
             >
               <Plus size={22} className="stroke-[3]" /> Crear Proyecto
             </motion.button>
