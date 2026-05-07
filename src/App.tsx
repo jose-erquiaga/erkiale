@@ -1796,12 +1796,37 @@ const App = () => {
 
                   {/* Header: Logo + Company */}
                   <div className="flex justify-between items-start mb-8">
-                    {/* Logo placeholder styled like the real EH logo */}
-                    <div className="w-28 h-20 border-2 border-slate-700 flex items-center justify-center relative">
-                      <div className="absolute inset-1 border border-slate-400 flex items-center justify-center">
-                        <span className="text-2xl font-black text-slate-700 tracking-tighter italic">EH</span>
-                      </div>
-                    </div>
+                    {/* EH Logo SVG - recreated from corporate identity */}
+                    <svg viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg" style={{width:'112px',height:'80px',display:'block'}}>
+                      {/* Grey left panel */}
+                      <rect x="12" y="6" width="82" height="128" fill="#cccccc"/>
+                      {/* Navy blue right panel */}
+                      <rect x="94" y="6" width="94" height="128" fill="#1e3a8a"/>
+
+                      {/* E letter — left panel, white fill with dark stroke (outline effect) */}
+                      {/* Vertical bar */}
+                      <rect x="18" y="18" width="13" height="104" fill="white" stroke="#1a1a1a" strokeWidth="1"/>
+                      {/* Top horizontal */}
+                      <rect x="18" y="18" width="58" height="13" fill="white" stroke="#1a1a1a" strokeWidth="1"/>
+                      {/* Middle horizontal (shorter) */}
+                      <rect x="18" y="62" width="44" height="11" fill="white" stroke="#1a1a1a" strokeWidth="1"/>
+                      {/* Bottom horizontal */}
+                      <rect x="18" y="109" width="58" height="13" fill="white" stroke="#1a1a1a" strokeWidth="1"/>
+
+                      {/* H letter — right panel, white on blue */}
+                      {/* Left vertical */}
+                      <rect x="104" y="18" width="13" height="104" fill="white"/>
+                      {/* Right vertical */}
+                      <rect x="165" y="18" width="13" height="104" fill="white"/>
+                      {/* Crossbar */}
+                      <rect x="104" y="62" width="74" height="11" fill="white"/>
+
+                      {/* Corner brackets — outer decorative frame */}
+                      <polyline points="2,22 2,2 22,2" fill="none" stroke="#1a1a1a" strokeWidth="4" strokeLinecap="square"/>
+                      <polyline points="2,118 2,138 22,138" fill="none" stroke="#1a1a1a" strokeWidth="4" strokeLinecap="square"/>
+                      <polyline points="198,22 198,2 178,2" fill="none" stroke="#1a1a1a" strokeWidth="4" strokeLinecap="square"/>
+                      <polyline points="198,118 198,138 178,138" fill="none" stroke="#1a1a1a" strokeWidth="4" strokeLinecap="square"/>
+                    </svg>
                     <div className="text-right text-[11px] leading-relaxed text-slate-700">
                       <p className="text-sm font-bold text-slate-900 mb-0.5">Erkiale S.L</p>
                       <p>B92898287</p>
