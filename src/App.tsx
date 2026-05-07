@@ -162,6 +162,7 @@ interface Project {
   clientPhone: string;
   status: 'En curso' | 'Pendiente' | 'Finalizado';
   category: string;
+  color?: string;
   ownerId?: string;
 }
 
@@ -797,6 +798,9 @@ const App = () => {
     e.preventDefault();
     if (!user) return;
     const formData = new FormData(e.currentTarget);
+    // Pick next color not already used; fall back to cycling if all 8 are taken
+    const usedColors = new Set(projects.map(p => p.color).filter(Boolean));
+    const nextColor = PROJECT_COLORS.find(c => !usedColors.has(c)) || PROJECT_COLORS[projects.length % PROJECT_COLORS.length];
     const newProject = {
       id: Date.now(),
       name: formData.get('name') as string,
@@ -807,6 +811,7 @@ const App = () => {
       clientPhone: formData.get('clientPhone') as string,
       status: 'Pendiente' as const,
       category: (formData.get('category') as string) || 'General',
+      color: nextColor,
       ownerId: user.uid
     };
     try {
@@ -819,12 +824,15 @@ const App = () => {
 
   const selectedProject = projects.find(p => p.firebaseId === selectedProjectId) || projects[0];
 
-  const selectedProjectIndex = projects.findIndex(p => p.firebaseId === selectedProjectId);
-  const activeColor = PROJECT_COLORS[(selectedProjectIndex >= 0 ? selectedProjectIndex : 0) % PROJECT_COLORS.length];
+  // Stable color per project: stored in Firestore; fallback uses project.id (stable timestamp) for old projects
+  const projectColorOf = (p: Project) =>
+    p.color || PROJECT_COLORS[p.id % PROJECT_COLORS.length];
+
+  const activeColor = selectedProject ? projectColorOf(selectedProject) : PROJECT_COLORS[0];
 
   const getProjectColor = (projFirebaseId: string) => {
-    const idx = projects.findIndex(p => p.firebaseId === projFirebaseId || String(p.id) === projFirebaseId);
-    return PROJECT_COLORS[(idx >= 0 ? idx : 0) % PROJECT_COLORS.length];
+    const proj = projects.find(p => p.firebaseId === projFirebaseId || String(p.id) === projFirebaseId);
+    return proj ? projectColorOf(proj) : PROJECT_COLORS[0];
   };
 
   // --- COMPONENTS ---
@@ -861,14 +869,14 @@ const App = () => {
         {/* Color dots — one per project */}
         {projects.length > 1 && (
           <div className="flex gap-1.5 mt-2 px-1">
-            {projects.map((p, i) => (
+            {projects.map((p) => (
               <button
                 key={p.firebaseId}
                 title={p.name}
                 onClick={() => setSelectedProjectId(p.firebaseId || '')}
                 className="w-2.5 h-2.5 rounded-full transition-all"
                 style={{
-                  background: PROJECT_COLORS[i % PROJECT_COLORS.length],
+                  background: projectColorOf(p),
                   opacity: p.firebaseId === selectedProjectId ? 1 : 0.35,
                   transform: p.firebaseId === selectedProjectId ? 'scale(1.4)' : 'scale(1)'
                 }}
@@ -936,7 +944,7 @@ const App = () => {
   const ProjectsView = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
       {projects.map((project, idx) => {
-        const projColor = PROJECT_COLORS[idx % PROJECT_COLORS.length];
+        const projColor = projectColorOf(project);
         const isSelected = selectedProjectId === project.firebaseId;
         return (
         <motion.div
