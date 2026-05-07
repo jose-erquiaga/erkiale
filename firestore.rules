@@ -8,34 +8,9 @@ service cloud.firestore {
 
     // --- HELPERS ---
     function isSignedIn() {
-      return request.auth != null && 
-             (request.auth.token.email == 'jose.erquiaga@gmail.com' || 
+      return request.auth != null &&
+             (request.auth.token.email == 'jose.erquiaga@gmail.com' ||
               request.auth.token.email == 'milnelas77@gmail.com');
-    }
-
-    function isAdmin() {
-      return isSignedIn() && request.auth.token.email == 'jose.erquiaga@gmail.com';
-    }
-
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    function isProjectOwner(projectId) {
-      let project = get(/databases/$(database)/documents/projects/$(projectId));
-      return project != null && isOwner(project.data.ownerId);
-    }
-
-    function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
-    }
-
-    function incoming() {
-      return request.resource.data;
-    }
-
-    function existing() {
-      return resource.data;
     }
 
     // --- VALIDATORS ---
@@ -55,15 +30,6 @@ service cloud.firestore {
              (!data.keys().hasAny(['id']) || data.id is number || data.id is string);
     }
 
-    function isValidBudgetItem(data) {
-      return data.keys().hasAll(['concept', 'qty', 'unit', 'price', 'total']) &&
-             data.concept is string && data.concept.size() > 0 &&
-             data.qty is number &&
-             data.unit is string &&
-             data.price is number &&
-             data.total is number;
-    }
-
     function isValidCalendarEvent(data) {
       return data.keys().hasAll(['projectId', 'date', 'task']) &&
              (data.projectId is string || data.projectId is number) &&
@@ -71,15 +37,23 @@ service cloud.firestore {
              data.task is string && data.task.size() > 0 && data.task.size() <= 500;
     }
 
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
     // --- RULES ---
-    
+
     match /projects/{projectId} {
-      allow get: if isOwner(existing().ownerId);
+      allow get: if isSignedIn() && existing().ownerId == request.auth.uid;
       allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
       allow create: if isSignedIn() && isValidProject(incoming());
-      allow update: if isOwner(existing().ownerId) && isValidProject(incoming()) &&
+      allow update: if isSignedIn() && existing().ownerId == request.auth.uid && isValidProject(incoming()) &&
                       incoming().ownerId == existing().ownerId;
-      allow delete: if isOwner(existing().ownerId);
+      allow delete: if isSignedIn() && existing().ownerId == request.auth.uid;
 
       // Subcollections
       match /budget_items/{itemId} {
@@ -94,23 +68,15 @@ service cloud.firestore {
     }
 
     match /catalog/{itemId} {
-      // Catalog is shared/public read for signed in users, but only admins (or owners of item) can write?
-      // Assuming catalog is global but editable by anyone for now as per app UI
       allow read: if isSignedIn();
       allow write: if isSignedIn() && (request.method != 'create' && request.method != 'update' || isValidCatalogItem(incoming()));
     }
 
     match /calendar_events/{eventId} {
-      allow read: if isSignedIn(); // Broad read for calendar coordination
+      allow read: if isSignedIn();
       allow write: if isSignedIn() && (request.method != 'create' && request.method != 'update' || isValidCalendarEvent(incoming()));
     }
 
-    match /settings/global {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
-    }
-
-    // Explicitly allow creating the document if it doesn't exist
     match /settings/{docId} {
       allow read, write: if isSignedIn();
     }
