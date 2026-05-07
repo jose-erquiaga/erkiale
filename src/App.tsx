@@ -1364,13 +1364,14 @@ const App = () => {
       }
     };
 
-    const handleAddManualExpense = (e: React.FormEvent<HTMLFormElement>) => {
+    const handleAddManualExpense = async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
-      const formData = new FormData(e.currentTarget);
+      const form = e.currentTarget;
+      const formData = new FormData(form);
       const qty = parseFloat(formData.get('qty') as string) || 0;
       const price = parseFloat(formData.get('price') as string) || 0;
-      
-      const newItem: ExpenseItem = {
+
+      const newItem = {
         id: Date.now(),
         concept: formData.get('concept') as string,
         qty,
@@ -1381,11 +1382,12 @@ const App = () => {
         category: formData.get('category') as string
       };
 
-      setExpenses(prev => ({
-        ...prev,
-        [project.id]: [newItem, ...(prev[project.id] || [])]
-      }));
-      e.currentTarget.reset();
+      try {
+        await addDoc(collection(db, 'projects', String(selectedProjectId), 'expense_items'), newItem);
+        form.reset();
+      } catch (error) {
+        handleFirestoreError(error, OperationType.CREATE, `projects/${selectedProjectId}/expense_items`);
+      }
     };
 
     return (
