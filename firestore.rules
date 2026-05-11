@@ -18,16 +18,31 @@ service cloud.firestore {
       return data.keys().hasAll(['name', 'status', 'ownerId']) &&
              data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
              data.status in ['En curso', 'Pendiente', 'Finalizado'] &&
-             data.ownerId is string;
+             data.ownerId is string && data.ownerId.size() > 0;
     }
 
     function isValidCatalogItem(data) {
       return data.keys().hasAll(['concept', 'unit', 'price']) &&
              data.concept is string && data.concept.size() > 0 && data.concept.size() <= 300 &&
              data.unit is string && data.unit.size() > 0 &&
-             data.price is number &&
+             data.price is number && data.price >= 0 &&
              (!data.keys().hasAny(['category']) || data.category is string) &&
              (!data.keys().hasAny(['id']) || data.id is number || data.id is string);
+    }
+
+    function isValidBudgetItem(data) {
+      return data.keys().hasAll(['concept', 'qty', 'unit', 'price', 'total']) &&
+             data.concept is string && data.concept.size() > 0 && data.concept.size() <= 300 &&
+             data.qty is number && data.qty > 0 &&
+             data.unit is string && data.unit.size() > 0 &&
+             data.price is number && data.price >= 0 &&
+             data.total is number && data.total >= 0;
+    }
+
+    function isValidExpenseItem(data) {
+      return data.keys().hasAll(['concept', 'amount']) &&
+             data.concept is string && data.concept.size() > 0 && data.concept.size() <= 300 &&
+             data.amount is number && data.amount >= 0;
     }
 
     function isValidCalendarEvent(data) {
@@ -55,24 +70,32 @@ service cloud.firestore {
 
       // Subcollections
       match /budget_items/{itemId} {
-        allow read, write: if isSignedIn();
+        allow read: if isSignedIn();
+        allow create, update: if isSignedIn() && isValidBudgetItem(incoming());
+        allow delete: if isSignedIn();
       }
       match /invoice_items/{itemId} {
-        allow read, write: if isSignedIn();
+        allow read: if isSignedIn();
+        allow create, update: if isSignedIn() && isValidBudgetItem(incoming());
+        allow delete: if isSignedIn();
       }
       match /expense_items/{itemId} {
-        allow read, write: if isSignedIn();
+        allow read: if isSignedIn();
+        allow create, update: if isSignedIn() && isValidExpenseItem(incoming());
+        allow delete: if isSignedIn();
       }
     }
 
     match /catalog/{itemId} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && (request.method != 'create' && request.method != 'update' || isValidCatalogItem(incoming()));
+      allow create, update: if isSignedIn() && isValidCatalogItem(incoming());
+      allow delete: if isSignedIn();
     }
 
     match /calendar_events/{eventId} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && (request.method != 'create' && request.method != 'update' || isValidCalendarEvent(incoming()));
+      allow create, update: if isSignedIn() && isValidCalendarEvent(incoming());
+      allow delete: if isSignedIn();
     }
 
     match /settings/{docId} {

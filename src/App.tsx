@@ -450,6 +450,9 @@ const App = () => {
   const [editingInvoiceItem, setEditingInvoiceItem] = useState<BudgetItem | null>(null);
   const [editingExpenseItem, setEditingExpenseItem] = useState<ExpenseItem | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ id: any; type: string; label: string } | null>(null);
+  const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
+  const [isSeedingCatalog, setIsSeedingCatalog] = useState(false);
+  const [isConfirmingCatalog, setIsConfirmingCatalog] = useState(false);
 
   // --- PERSISTENCE ---
   useEffect(() => {
@@ -580,8 +583,7 @@ const App = () => {
       alert("No hay partidas en el presupuesto activo para facturar.");
       return;
     }
-    
-    // Check if there are already items in the invoice
+
     if (invoices[selectedProjectId] && invoices[selectedProjectId].length > 0) {
       if (!confirm("Ya existe una factura para este proyecto con cambios guardados. ¿Deseas SOBRESCRIBIRLA con los datos del presupuesto actual? Perderás los cambios específicos de facturación.")) {
         setActiveTab('billing');
@@ -589,9 +591,9 @@ const App = () => {
       }
     }
 
+    setIsGeneratingInvoice(true);
     try {
       const projectIdStr = String(selectedProjectId);
-      // Delete old invoice items first
       const existingInvoices = invoices[selectedProjectId] || [];
       for (const item of existingInvoices) {
         if (item.firebaseId) {
@@ -599,7 +601,6 @@ const App = () => {
         }
       }
 
-      // Add new ones
       for (const item of budgetItems) {
         await addDoc(collection(db, 'projects', projectIdStr, 'invoice_items'), {
           concept: item.concept,
@@ -612,6 +613,8 @@ const App = () => {
       setActiveTab('billing');
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `projects/${selectedProjectId}/invoice_items`);
+    } finally {
+      setIsGeneratingInvoice(false);
     }
   };
 
@@ -725,9 +728,14 @@ const App = () => {
     const eventFirebaseId = e.dataTransfer.getData('text/plain');
     if (!eventFirebaseId) return;
 
+    const oldDate = events.find(ev => ev.firebaseId === eventFirebaseId)?.date;
+    setEvents(prev => prev.map(ev => ev.firebaseId === eventFirebaseId ? { ...ev, date } : ev));
     try {
       await updateDoc(doc(db, 'calendar_events', eventFirebaseId), { date });
     } catch (error) {
+      if (oldDate !== undefined) {
+        setEvents(prev => prev.map(ev => ev.firebaseId === eventFirebaseId ? { ...ev, date: oldDate } : ev));
+      }
       handleFirestoreError(error, OperationType.UPDATE, `calendar_events/${eventFirebaseId}`);
     }
   };
@@ -879,30 +887,47 @@ const App = () => {
 
   const handleConfirmScannedCatalog = async () => {
     if (!scannedCatalogPreview) return;
-    for (const item of scannedCatalogPreview) {
-      await addDoc(collection(db, 'catalog'), { ...item, id: Date.now() + Math.random() });
+    setIsConfirmingCatalog(true);
+    try {
+      for (const item of scannedCatalogPreview) {
+        await addDoc(collection(db, 'catalog'), { ...item, id: Date.now() + Math.random() });
+      }
+      setScannedCatalogPreview(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'catalog');
+    } finally {
+      setIsConfirmingCatalog(false);
     }
-    setScannedCatalogPreview(null);
   };
 
   const handleSeedCatalog = async () => {
     if (!isAdmin()) { alert("Solo el administrador puede realizar esta acción."); return; }
     if (!confirm(`¿Poblar el catálogo con ${CATALOG_SEED.length} partidas en ${CATALOG_SEED_CATEGORIES.length} categorías?\n\nSe añadirán a los items existentes (no se borrará nada).`)) return;
+    setIsSeedingCatalog(true);
     try {
-      // Update settings with all categories + units
       await setDoc(doc(db, 'settings', 'global'), {
         categories: CATALOG_SEED_CATEGORIES,
         units: CATALOG_SEED_UNITS
       }, { merge: true });
-      // Add all catalog items in batches
       let count = 0;
+      let errors = 0;
       for (const item of CATALOG_SEED) {
-        await addDoc(collection(db, 'catalog'), { ...item, id: Date.now() + Math.random() });
-        count++;
+        try {
+          await addDoc(collection(db, 'catalog'), { ...item, id: Date.now() + Math.random() });
+          count++;
+        } catch {
+          errors++;
+        }
       }
-      alert(`✓ Catálogo poblado: ${count} partidas en ${CATALOG_SEED_CATEGORIES.length} categorías.`);
+      if (errors > 0) {
+        alert(`Catálogo poblado con ${count} partidas (${errors} fallaron). Revisa la conexión.`);
+      } else {
+        alert(`✓ Catálogo poblado: ${count} partidas en ${CATALOG_SEED_CATEGORIES.length} categorías.`);
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'catalog');
+    } finally {
+      setIsSeedingCatalog(false);
     }
   };
 
@@ -1033,7 +1058,7 @@ const App = () => {
     }
   };
 
-  const selectedProject = projects.find(p => p.firebaseId === selectedProjectId) || projects[0];
+  const selectedProject = projects.find(p => p.firebaseId === selectedProjectId) || projects[0] || null;
 
   // Stable color per project: stored in Firestore; fallback uses project.id (stable timestamp) for old projects
   const projectColorOf = (p: Project) =>
@@ -1143,9 +1168,10 @@ const App = () => {
             <>
               <button
                 onClick={handleSeedCatalog}
-                className="w-full mt-2 flex items-center gap-3 p-3 rounded-xl text-emerald-600 hover:text-white hover:bg-emerald-800/40 transition-all text-[9px] font-black uppercase tracking-widest"
+                disabled={isSeedingCatalog}
+                className="w-full mt-2 flex items-center gap-3 p-3 rounded-xl text-emerald-600 hover:text-white hover:bg-emerald-800/40 transition-all text-[9px] font-black uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <BookOpen size={16} /> Poblar Catálogo
+                <BookOpen size={16} /> {isSeedingCatalog ? 'Poblando...' : 'Poblar Catálogo'}
               </button>
               <button
                 onClick={handleResetDatabase}
@@ -1568,11 +1594,12 @@ const App = () => {
              >
                Vista Previa Presupuesto
              </button>
-             <button 
+             <button
                onClick={handleGenerateInvoice}
-               className="px-8 py-3 rounded-2xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl"
+               disabled={isGeneratingInvoice}
+               className="px-8 py-3 rounded-2xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
              >
-               Pasar a Facturación
+               {isGeneratingInvoice ? 'Generando...' : 'Pasar a Facturación'}
              </button>
           </div>
         </div>
@@ -1688,13 +1715,20 @@ const App = () => {
 
       try {
         const extractedItems = await scanDocument(file, ScanType.EXPENSE);
-        
+        let saved = 0;
         for (const item of extractedItems) {
-          const newItem = {
-            ...item,
-            id: Date.now() + Math.random()
-          };
-          await addDoc(collection(db, 'projects', String(selectedProjectId), 'expense_items'), newItem);
+          try {
+            await addDoc(collection(db, 'projects', String(selectedProjectId), 'expense_items'), {
+              ...item,
+              id: Date.now() + Math.random()
+            });
+            saved++;
+          } catch {
+            // continue saving remaining items
+          }
+        }
+        if (saved === 0 && extractedItems.length > 0) {
+          setScanError("No se pudieron guardar los gastos. Comprueba tu conexión.");
         }
       } catch (error) {
         console.error("AI Scan Error:", error);
@@ -1811,9 +1845,9 @@ const App = () => {
               <input name="date" type="date" required defaultValue={new Date().toISOString().split('T')[0]} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" />
             </div>
             <div className="grid grid-cols-3 gap-2">
-              <input name="qty" placeholder="Cant." type="number" step="0.01" required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" />
+              <input name="qty" placeholder="Cant." type="number" step="0.01" min="0.01" required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" />
               <input name="unit" placeholder="Ud." required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" />
-              <input name="price" placeholder="€/Ud." type="number" step="0.01" required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" />
+              <input name="price" placeholder="€/Ud." type="number" step="0.01" min="0" required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" />
             </div>
             <button type="submit" className="w-full bg-slate-900 text-white p-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl">Añadir Gasto</button>
           </form>
@@ -1915,11 +1949,11 @@ const App = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Cantidad ({editingBudgetItem.unit})</label>
-                       <input name="qty" type="number" step="0.01" defaultValue={editingBudgetItem.qty} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
+                       <input name="qty" type="number" step="0.01" min="0.01" defaultValue={editingBudgetItem.qty} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
                     </div>
                     <div className="space-y-2">
                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Precio Ud (€)</label>
-                       <input name="price" type="number" step="0.01" defaultValue={editingBudgetItem.price} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
+                       <input name="price" type="number" step="0.01" min="0" defaultValue={editingBudgetItem.price} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
                     </div>
                   </div>
                   <button type="submit" className="w-full bg-blue-600 text-white p-5 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 mt-2">Guardar Cambios</button>
@@ -2020,7 +2054,7 @@ const App = () => {
                   <div className="grid grid-cols-3 gap-2">
                     <div className="space-y-2">
                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Cant.</label>
-                       <input name="qty" type="number" step="0.01" defaultValue={editingExpenseItem.qty} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
+                       <input name="qty" type="number" step="0.01" min="0.01" defaultValue={editingExpenseItem.qty} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
                     </div>
                     <div className="space-y-2">
                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Ud.</label>
@@ -2028,7 +2062,7 @@ const App = () => {
                     </div>
                     <div className="space-y-2">
                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Precio €/u</label>
-                       <input name="price" type="number" step="0.01" defaultValue={editingExpenseItem.price} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
+                       <input name="price" type="number" step="0.01" min="0" defaultValue={editingExpenseItem.price} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
                     </div>
                   </div>
                   <button type="submit" className="w-full bg-slate-900 text-white p-5 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-800 transition-all shadow-xl shadow-slate-100 mt-2">Guardar Cambios</button>
@@ -2056,11 +2090,11 @@ const App = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Cantidad ({editingInvoiceItem.unit})</label>
-                       <input name="qty" type="number" step="0.01" defaultValue={editingInvoiceItem.qty} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
+                       <input name="qty" type="number" step="0.01" min="0.01" defaultValue={editingInvoiceItem.qty} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
                     </div>
                     <div className="space-y-2">
                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Precio Ud (€)</label>
-                       <input name="price" type="number" step="0.01" defaultValue={editingInvoiceItem.price} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
+                       <input name="price" type="number" step="0.01" min="0" defaultValue={editingInvoiceItem.price} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
                     </div>
                   </div>
                   <button type="submit" className="w-full bg-emerald-600 text-white p-5 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 mt-2">Guardar Cambios Factura</button>
@@ -2094,7 +2128,7 @@ const App = () => {
                     </div>
                     <div className="space-y-2">
                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Precio Ud (€)</label>
-                       <input name="price" type="number" step="0.01" defaultValue={editingCatalogItem.price} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
+                       <input name="price" type="number" step="0.01" min="0" defaultValue={editingCatalogItem.price} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
                     </div>
                   </div>
                   <button type="submit" className="w-full bg-blue-600 text-white p-5 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 mt-2">Actualizar Maestro</button>
@@ -2167,9 +2201,9 @@ const App = () => {
                   className="px-6 py-3 rounded-xl border border-slate-200 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-100 transition-all">
                   Cancelar
                 </button>
-                <button onClick={handleConfirmScannedCatalog} disabled={scannedCatalogPreview.length === 0}
-                  className="px-8 py-3 rounded-xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 disabled:bg-slate-300">
-                  Guardar {scannedCatalogPreview.length} ítem{scannedCatalogPreview.length !== 1 ? 's' : ''} en Catálogo
+                <button onClick={handleConfirmScannedCatalog} disabled={scannedCatalogPreview.length === 0 || isConfirmingCatalog}
+                  className="px-8 py-3 rounded-xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 disabled:bg-slate-300 disabled:cursor-not-allowed">
+                  {isConfirmingCatalog ? 'Guardando...' : `Guardar ${scannedCatalogPreview.length} ítem${scannedCatalogPreview.length !== 1 ? 's' : ''} en Catálogo`}
                 </button>
               </div>
             </motion.div>
@@ -2529,29 +2563,39 @@ const App = () => {
                                         <>
                                           <input autoFocus value={editingCatName.val}
                                             onChange={e => setEditingCatName({old: cat, val: e.target.value})}
-                                            onKeyDown={e => {
+                                            onKeyDown={async e => {
                                               if (e.key === 'Enter') {
                                                 const v = editingCatName.val.trim();
                                                 if (v && v !== cat && !categories.includes(v)) {
                                                   const newCats = categories.map(c => c === cat ? v : c);
-                                                  setDoc(doc(db, 'settings', 'global'), { categories: newCats, units }, { merge: true })
-                                                    .catch(err => handleFirestoreError(err, OperationType.WRITE, 'settings/global'));
-                                                  catalog.filter(i => i.category === cat && i.firebaseId).forEach(i =>
-                                                    updateDoc(doc(db, 'catalog', i.firebaseId!), { category: v }).catch(() => {}));
+                                                  try {
+                                                    await Promise.all([
+                                                      setDoc(doc(db, 'settings', 'global'), { categories: newCats, units }, { merge: true }),
+                                                      ...catalog.filter(i => i.category === cat && i.firebaseId).map(i =>
+                                                        updateDoc(doc(db, 'catalog', i.firebaseId!), { category: v }))
+                                                    ]);
+                                                  } catch (err) {
+                                                    handleFirestoreError(err, OperationType.WRITE, 'settings/global');
+                                                  }
                                                 }
                                                 setEditingCatName(null);
                                               }
                                               if (e.key === 'Escape') setEditingCatName(null);
                                             }}
                                             className="text-[11px] font-bold bg-white border border-blue-300 rounded-lg px-2 py-0.5 outline-none w-24"/>
-                                          <button onClick={() => {
+                                          <button onClick={async () => {
                                             const v = editingCatName.val.trim();
                                             if (v && v !== cat && !categories.includes(v)) {
                                               const newCats = categories.map(c => c === cat ? v : c);
-                                              setDoc(doc(db, 'settings', 'global'), { categories: newCats, units }, { merge: true })
-                                                .catch(err => handleFirestoreError(err, OperationType.WRITE, 'settings/global'));
-                                              catalog.filter(i => i.category === cat && i.firebaseId).forEach(i =>
-                                                updateDoc(doc(db, 'catalog', i.firebaseId!), { category: v }).catch(() => {}));
+                                              try {
+                                                await Promise.all([
+                                                  setDoc(doc(db, 'settings', 'global'), { categories: newCats, units }, { merge: true }),
+                                                  ...catalog.filter(i => i.category === cat && i.firebaseId).map(i =>
+                                                    updateDoc(doc(db, 'catalog', i.firebaseId!), { category: v }))
+                                                ]);
+                                              } catch (err) {
+                                                handleFirestoreError(err, OperationType.WRITE, 'settings/global');
+                                              }
                                             }
                                             setEditingCatName(null);
                                           }} className="p-1 text-emerald-500 hover:bg-emerald-50 rounded-lg"><CheckCircle2 size={10}/></button>
@@ -2577,29 +2621,39 @@ const App = () => {
                                         <>
                                           <input autoFocus value={editingUnitName.val}
                                             onChange={e => setEditingUnitName({old: u, val: e.target.value})}
-                                            onKeyDown={e => {
+                                            onKeyDown={async e => {
                                               if (e.key === 'Enter') {
                                                 const v = editingUnitName.val.trim();
                                                 if (v && v !== u && !units.includes(v)) {
                                                   const newUnits = units.map(un => un === u ? v : un);
-                                                  setDoc(doc(db, 'settings', 'global'), { categories, units: newUnits }, { merge: true })
-                                                    .catch(err => handleFirestoreError(err, OperationType.WRITE, 'settings/global'));
-                                                  catalog.filter(i => i.unit === u && i.firebaseId).forEach(i =>
-                                                    updateDoc(doc(db, 'catalog', i.firebaseId!), { unit: v }).catch(() => {}));
+                                                  try {
+                                                    await Promise.all([
+                                                      setDoc(doc(db, 'settings', 'global'), { categories, units: newUnits }, { merge: true }),
+                                                      ...catalog.filter(i => i.unit === u && i.firebaseId).map(i =>
+                                                        updateDoc(doc(db, 'catalog', i.firebaseId!), { unit: v }))
+                                                    ]);
+                                                  } catch (err) {
+                                                    handleFirestoreError(err, OperationType.WRITE, 'settings/global');
+                                                  }
                                                 }
                                                 setEditingUnitName(null);
                                               }
                                               if (e.key === 'Escape') setEditingUnitName(null);
                                             }}
                                             className="text-[11px] font-bold bg-white border border-blue-300 rounded-lg px-2 py-0.5 outline-none w-24"/>
-                                          <button onClick={() => {
+                                          <button onClick={async () => {
                                             const v = editingUnitName.val.trim();
                                             if (v && v !== u && !units.includes(v)) {
                                               const newUnits = units.map(un => un === u ? v : un);
-                                              setDoc(doc(db, 'settings', 'global'), { categories, units: newUnits }, { merge: true })
-                                                .catch(err => handleFirestoreError(err, OperationType.WRITE, 'settings/global'));
-                                              catalog.filter(i => i.unit === u && i.firebaseId).forEach(i =>
-                                                updateDoc(doc(db, 'catalog', i.firebaseId!), { unit: v }).catch(() => {}));
+                                              try {
+                                                await Promise.all([
+                                                  setDoc(doc(db, 'settings', 'global'), { categories, units: newUnits }, { merge: true }),
+                                                  ...catalog.filter(i => i.unit === u && i.firebaseId).map(i =>
+                                                    updateDoc(doc(db, 'catalog', i.firebaseId!), { unit: v }))
+                                                ]);
+                                              } catch (err) {
+                                                handleFirestoreError(err, OperationType.WRITE, 'settings/global');
+                                              }
                                             }
                                             setEditingUnitName(null);
                                           }} className="p-1 text-emerald-500 hover:bg-emerald-50 rounded-lg"><CheckCircle2 size={10}/></button>
@@ -2640,7 +2694,7 @@ const App = () => {
                        </div>
                        <div className="md:col-span-2 space-y-2">
                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">P. Unitario (€)</label>
-                         <input name="price" required type="number" step="0.01" placeholder="0.00" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-100 transition-all font-bold text-sm" />
+                         <input name="price" required type="number" step="0.01" min="0" placeholder="0.00" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-100 transition-all font-bold text-sm" />
                        </div>
                        <div className="md:col-span-1">
                          <button type="submit" className="bg-blue-600 text-white p-4 h-[60px] w-full rounded-2xl font-black flex items-center justify-center hover:bg-blue-700 transition-all shadow-xl shadow-blue-100">
