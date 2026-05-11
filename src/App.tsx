@@ -488,7 +488,7 @@ const App = () => {
 
     const pathProjects = 'projects';
     // Load Projects
-    const projectsQuery = query(collection(db, 'projects'), where('ownerId', '==', user.uid));
+    const projectsQuery = collection(db, 'projects');
     const projectsUnsubscribe = onSnapshot(projectsQuery, (snapshot) => {
       const projectsList = snapshot.docs.map(doc => ({ ...doc.data(), firebaseId: doc.id } as Project));
       setProjects(projectsList);

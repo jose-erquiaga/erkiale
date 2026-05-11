@@ -18,7 +18,7 @@ service cloud.firestore {
       return data.keys().hasAll(['name', 'status', 'ownerId']) &&
              data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
              data.status in ['En curso', 'Pendiente', 'Finalizado'] &&
-             data.ownerId == request.auth.uid;
+             data.ownerId is string;
     }
 
     function isValidCatalogItem(data) {
@@ -48,12 +48,10 @@ service cloud.firestore {
     // --- RULES ---
 
     match /projects/{projectId} {
-      allow get: if isSignedIn() && existing().ownerId == request.auth.uid;
-      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow get, list: if isSignedIn();
       allow create: if isSignedIn() && isValidProject(incoming());
-      allow update: if isSignedIn() && existing().ownerId == request.auth.uid && isValidProject(incoming()) &&
-                      incoming().ownerId == existing().ownerId;
-      allow delete: if isSignedIn() && existing().ownerId == request.auth.uid;
+      allow update: if isSignedIn() && isValidProject(incoming()) && incoming().ownerId == existing().ownerId;
+      allow delete: if isSignedIn();
 
       // Subcollections
       match /budget_items/{itemId} {
