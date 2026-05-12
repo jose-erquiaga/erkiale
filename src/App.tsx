@@ -1384,13 +1384,14 @@ const App = () => {
     const [selectedCatalogId, setSelectedCatalogId] = useState<string>('');
     const [addQty, setAddQty] = useState<number>(1);
 
-    const filteredCatalog = catalog.filter(i => i.category === selectedCategory);
+    const filteredCatalog = React.useMemo(
+      () => catalog.filter(i => i.category === selectedCategory),
+      [catalog, selectedCategory]
+    );
 
-    // Update selected item when category or catalog changes (catalog loads async from Firestore)
     React.useEffect(() => {
-        const filtered = catalog.filter(i => i.category === selectedCategory);
-        setSelectedCatalogId(filtered.length > 0 ? (filtered[0].firebaseId || '') : '');
-    }, [selectedCategory, catalog]);
+        setSelectedCatalogId(filteredCatalog.length > 0 ? (filteredCatalog[0].firebaseId || '') : '');
+    }, [filteredCatalog]);
 
     return (
       <div className="space-y-8">
@@ -2224,11 +2225,20 @@ const App = () => {
                     if (!content) return;
                     const pw = window.open('', '_blank', 'width=900,height=700');
                     if (!pw) return;
-                    pw.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Erkiale</title>
-                    <script src="https://cdn.tailwindcss.com"></script>
-                    <style>@page{size:A4 portrait;margin:12mm 14mm;}body{font-family:sans-serif;background:white;}</style>
-                    </head><body>${content.outerHTML}<script>window.onload=function(){setTimeout(function(){window.print();},1200);};<\/script></body></html>`);
-                    pw.document.close();
+                    const pdoc = pw.document;
+                    pdoc.open();
+                    pdoc.write('<!DOCTYPE html>');
+                    pdoc.close();
+                    pdoc.documentElement.lang = 'es';
+                    const head = pdoc.head;
+                    const meta = pdoc.createElement('meta'); meta.setAttribute('charset', 'UTF-8'); head.appendChild(meta);
+                    const title = pdoc.createElement('title'); title.textContent = 'Erkiale'; head.appendChild(title);
+                    const tw = pdoc.createElement('script'); tw.src = 'https://cdn.tailwindcss.com'; head.appendChild(tw);
+                    const style = pdoc.createElement('style'); style.textContent = '@page{size:A4 portrait;margin:12mm 14mm;}body{font-family:sans-serif;background:white;}'; head.appendChild(style);
+                    pdoc.body.appendChild(content.cloneNode(true));
+                    const trigger = pdoc.createElement('script');
+                    trigger.textContent = 'window.onload=function(){setTimeout(function(){window.print();},1200);};';
+                    pdoc.body.appendChild(trigger);
                   }} className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase flex items-center gap-2 shadow-lg shadow-blue-100">
                     <FileText size={14}/> Imprimir / PDF
                   </button>
