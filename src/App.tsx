@@ -166,6 +166,26 @@ interface Project {
   ownerId?: string;
 }
 
+interface CompanyInfo {
+  name: string;
+  cif: string;
+  address: string;
+  city: string;
+  phone: string;
+  email: string;
+}
+
+const DEFAULT_COMPANY: CompanyInfo = {
+  name: 'Erkiale S.L',
+  cif: 'B92898287',
+  address: 'Avda Julio Iglesias 3',
+  city: '29660 Nueva Andalucia, Málaga, España',
+  phone: '647462631',
+  email: '',
+};
+
+const DEFAULT_EXPENSE_CATEGORIES = ['Materiales', 'Mano de Obra', 'Herramientas', 'Varios'];
+
 interface CatalogItem {
   id: number;
   firebaseId?: string;
@@ -453,6 +473,10 @@ const App = () => {
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
   const [isSeedingCatalog, setIsSeedingCatalog] = useState(false);
   const [isConfirmingCatalog, setIsConfirmingCatalog] = useState(false);
+  const [companyInfo, setCompanyInfo] = useState<CompanyInfo>(DEFAULT_COMPANY);
+  const [expenseCategories, setExpenseCategories] = useState<string[]>(DEFAULT_EXPENSE_CATEGORIES);
+  const [isEditingCompany, setIsEditingCompany] = useState(false);
+  const [companyDraft, setCompanyDraft] = useState<CompanyInfo>(DEFAULT_COMPANY);
 
   // --- PERSISTENCE ---
   useEffect(() => {
@@ -477,6 +501,8 @@ const App = () => {
         const data = snapshot.data();
         if (data.categories) setCategories(data.categories);
         if (data.units) setUnits(data.units);
+        if (data.companyInfo) setCompanyInfo(data.companyInfo);
+        if (data.expenseCategories) setExpenseCategories(data.expenseCategories);
       }
     }, (error) => handleFirestoreError(error, OperationType.GET, pathSettings));
 
@@ -1838,10 +1864,7 @@ const App = () => {
             <input name="concept" placeholder="Concepto" required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" />
             <div className="grid grid-cols-2 gap-4">
               <select name="category" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold appearance-none">
-                <option>Materiales</option>
-                <option>Mano de Obra</option>
-                <option>Herramientas</option>
-                <option>Varios</option>
+                {expenseCategories.map(c => <option key={c}>{c}</option>)}
               </select>
               <input name="date" type="date" required defaultValue={new Date().toISOString().split('T')[0]} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" />
             </div>
@@ -2041,10 +2064,7 @@ const App = () => {
                     <div className="space-y-2">
                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Categoría</label>
                        <select name="category" defaultValue={editingExpenseItem.category} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all appearance-none">
-                         <option>Materiales</option>
-                         <option>Mano de Obra</option>
-                         <option>Herramientas</option>
-                         <option>Varios</option>
+                         {expenseCategories.map(c => <option key={c}>{c}</option>)}
                        </select>
                     </div>
                     <div className="space-y-2">
@@ -2294,11 +2314,12 @@ const App = () => {
                       <polyline points="198,118 198,138 178,138" fill="none" stroke="#1a1a1a" strokeWidth="4" strokeLinecap="square"/>
                     </svg>
                     <div className="text-right text-[11px] leading-relaxed text-slate-700">
-                      <p className="text-sm font-bold text-slate-900 mb-0.5">Erkiale S.L</p>
-                      <p>B92898287</p>
-                      <p>Avda Julio Iglesias 3</p>
-                      <p>29660 Nueva Andalucia, Málaga, España</p>
-                      <p>Telf. 647462631</p>
+                      <p className="text-sm font-bold text-slate-900 mb-0.5">{companyInfo.name}</p>
+                      {companyInfo.cif && <p>{companyInfo.cif}</p>}
+                      {companyInfo.address && <p>{companyInfo.address}</p>}
+                      {companyInfo.city && <p>{companyInfo.city}</p>}
+                      {companyInfo.phone && <p>Telf. {companyInfo.phone}</p>}
+                      {companyInfo.email && <p>{companyInfo.email}</p>}
                     </div>
                   </div>
 
@@ -2684,7 +2705,109 @@ const App = () => {
                          </motion.div>
                        )}
                      </AnimatePresence>
-                     
+
+                     {/* ── Datos de Empresa ── */}
+                     <div className="border-t border-slate-100 pt-8 mb-8">
+                       <div className="flex items-center justify-between mb-5">
+                         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Datos de Empresa (Facturas)</h4>
+                         <button
+                           type="button"
+                           onClick={() => { setCompanyDraft(companyInfo); setIsEditingCompany(!isEditingCompany); }}
+                           className={`flex items-center gap-2 text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-xl border transition-all ${isEditingCompany ? 'bg-slate-900 text-white border-slate-900' : 'text-slate-500 bg-slate-50 border-slate-200 hover:bg-slate-100'}`}
+                         >
+                           <Hammer size={11}/> {isEditingCompany ? 'Cancelar' : 'Editar'}
+                         </button>
+                       </div>
+                       <AnimatePresence>
+                         {isEditingCompany ? (
+                           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                             <form onSubmit={async (e) => {
+                               e.preventDefault();
+                               try {
+                                 await setDoc(doc(db, 'settings', 'global'), { companyInfo: companyDraft }, { merge: true });
+                                 setIsEditingCompany(false);
+                               } catch (err) {
+                                 handleFirestoreError(err, OperationType.WRITE, 'settings/global');
+                               }
+                             }} className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-2">
+                               {([
+                                 { field: 'name', label: 'Nombre / Razón social' },
+                                 { field: 'cif', label: 'CIF / NIF' },
+                                 { field: 'address', label: 'Dirección' },
+                                 { field: 'city', label: 'Población y CP' },
+                                 { field: 'phone', label: 'Teléfono' },
+                                 { field: 'email', label: 'Email' },
+                               ] as { field: keyof CompanyInfo; label: string }[]).map(({ field, label }) => (
+                                 <div key={field} className="space-y-1">
+                                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">{label}</label>
+                                   <input
+                                     value={companyDraft[field]}
+                                     onChange={e => setCompanyDraft(prev => ({ ...prev, [field]: e.target.value }))}
+                                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all"
+                                   />
+                                 </div>
+                               ))}
+                               <div className="md:col-span-2 flex gap-3 pt-2">
+                                 <button type="submit" className="px-6 py-2.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">
+                                   Guardar Datos
+                                 </button>
+                                 <button type="button" onClick={() => setIsEditingCompany(false)} className="px-6 py-2.5 border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50 transition-all">
+                                   Cancelar
+                                 </button>
+                               </div>
+                             </form>
+                           </motion.div>
+                         ) : (
+                           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[11px] leading-relaxed text-slate-600 space-y-0.5">
+                             <p className="font-black text-slate-800">{companyInfo.name}</p>
+                             {companyInfo.cif && <p>{companyInfo.cif}</p>}
+                             {companyInfo.address && <p>{companyInfo.address}</p>}
+                             {companyInfo.city && <p>{companyInfo.city}</p>}
+                             {companyInfo.phone && <p>Telf. {companyInfo.phone}</p>}
+                             {companyInfo.email && <p>{companyInfo.email}</p>}
+                           </motion.div>
+                         )}
+                       </AnimatePresence>
+                     </div>
+
+                     {/* ── Categorías de Gasto ── */}
+                     <div className="border-t border-slate-100 pt-8 mb-8">
+                       <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Categorías de Gasto</h4>
+                       <div className="flex flex-wrap gap-2 mb-3">
+                         {expenseCategories.map(cat => (
+                           <div key={cat} className="flex items-center gap-1 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
+                             <span className="text-[11px] font-bold text-slate-700">{cat}</span>
+                             {expenseCategories.length > 1 && (
+                               <button onClick={async () => {
+                                 const updated = expenseCategories.filter(c => c !== cat);
+                                 try {
+                                   await setDoc(doc(db, 'settings', 'global'), { expenseCategories: updated }, { merge: true });
+                                 } catch (err) {
+                                   handleFirestoreError(err, OperationType.WRITE, 'settings/global');
+                                 }
+                               }} className="p-1 text-rose-400 hover:bg-rose-50 rounded-lg ml-1"><X size={10}/></button>
+                             )}
+                           </div>
+                         ))}
+                         <form onSubmit={async (e) => {
+                           e.preventDefault();
+                           const fd = new FormData(e.currentTarget);
+                           const val = (fd.get('newExpCat') as string).trim();
+                           if (!val || expenseCategories.includes(val)) return;
+                           const updated = [...expenseCategories, val];
+                           try {
+                             await setDoc(doc(db, 'settings', 'global'), { expenseCategories: updated }, { merge: true });
+                             (e.currentTarget as HTMLFormElement).reset();
+                           } catch (err) {
+                             handleFirestoreError(err, OperationType.WRITE, 'settings/global');
+                           }
+                         }} className="flex items-center gap-1">
+                           <input name="newExpCat" placeholder="Nueva..." className="text-[11px] font-bold bg-white border border-slate-200 rounded-lg px-2 py-1 outline-none focus:ring-2 focus:ring-blue-100 w-24" />
+                           <button type="submit" className="p-1 text-emerald-500 hover:bg-emerald-50 rounded-lg"><CheckCircle2 size={14}/></button>
+                         </form>
+                       </div>
+                     </div>
+
                      <form onSubmit={handleAddCatalogItem} className="grid grid-cols-1 md:grid-cols-12 gap-5 items-end">
                        <div className="md:col-span-3 space-y-2">
                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Categoría</label>
