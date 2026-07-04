@@ -12,6 +12,7 @@ import {
   LogOut,
   Database,
   Settings,
+  Wallet,
 } from 'lucide-react';
 import type { Project } from '../types';
 import type { User as FirebaseUser } from 'firebase/auth';
@@ -48,6 +49,25 @@ export const Sidebar = ({
         <Hammer size={24} style={{color: activeColor}} /> ERKIALE<span style={{color: activeColor}}> S.L</span>
       </h1>
       <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em]">Gestión de Obras</p>
+    </div>
+
+    {/* General — shared across all projects */}
+    <div className="p-4 pb-3 space-y-1 border-b border-slate-800">
+      <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 px-1">General</p>
+      {[
+        { id: 'company-expenses', label: 'Gasto Erkiale', icon: Wallet },
+        { id: 'structure', label: 'Catálogo', icon: Settings },
+      ].map(item => (
+        <button
+          key={item.id}
+          onClick={() => setActiveTab(item.id)}
+          className={`w-full flex items-center gap-3 p-3.5 rounded-2xl transition-all duration-300 text-sm font-semibold group ${activeTab === item.id ? 'text-white ring-1 ring-white/10' : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}
+          style={activeTab === item.id ? {backgroundColor: activeColor, boxShadow: `0 4px 20px ${activeColor}50`} : {}}
+        >
+          <item.icon size={18} className={activeTab === item.id ? 'text-white' : 'text-slate-500 group-hover:text-white transition-colors'} />
+          {item.label}
+        </button>
+      ))}
     </div>
 
     {/* Project selector — top */}
@@ -94,7 +114,6 @@ export const Sidebar = ({
       {[
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { id: 'projects', label: 'Proyectos', icon: Briefcase },
-        { id: 'structure', label: 'Catálogo', icon: Settings },
         { id: 'budgets', label: 'Presupuesto Activo', icon: FileText },
         { id: 'global-calendar', label: 'Calendario Global', icon: CalendarIcon },
         { id: 'billing', label: 'Facturación', icon: Receipt },
