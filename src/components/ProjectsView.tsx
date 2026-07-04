@@ -95,7 +95,7 @@ export const ProjectsView = ({
             onClick={(e) => {
               e.stopPropagation();
               setSelectedProjectId(project.firebaseId || '');
-              setActiveTab('budgets');
+              setActiveTab('project-calendar');
             }}
             className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all"
             style={{color: projColor}}

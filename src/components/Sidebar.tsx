@@ -4,6 +4,7 @@ import {
   Hammer,
   ChevronRight,
   User,
+  Users,
   FileText,
   Calendar as CalendarIcon,
   Receipt,
@@ -55,6 +56,8 @@ export const Sidebar = ({
     <div className="p-4 pb-3 space-y-1 border-b border-slate-800">
       <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 px-1">General</p>
       {[
+        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { id: 'clients', label: 'Clientes', icon: Users },
         { id: 'company-expenses', label: 'Gasto Erkiale', icon: Wallet },
         { id: 'structure', label: 'Catálogo', icon: Settings },
         { id: 'global-calendar', label: 'Calendario Global', icon: CalendarIcon },
@@ -113,8 +116,8 @@ export const Sidebar = ({
     {/* Nav */}
     <nav className="flex-1 p-4 space-y-1 mt-2">
       {[
-        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { id: 'projects', label: 'Proyectos', icon: Briefcase },
+        { id: 'project-calendar', label: 'Calendario Proyecto', icon: CalendarIcon },
         { id: 'budgets', label: 'Presupuesto Activo', icon: FileText },
         { id: 'billing', label: 'Facturación', icon: Receipt },
         { id: 'expenses', label: 'Gastos', icon: Ticket },

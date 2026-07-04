@@ -17,12 +17,15 @@ import {
 import { useAuth } from './hooks/useAuth';
 import { useSettings } from './hooks/useSettings';
 import { useCalendarEvents } from './hooks/useCalendarEvents';
+import { useClients } from './hooks/useClients';
 import { useProjects } from './hooks/useProjects';
 import { useProjectSubcollections } from './hooks/useProjectSubcollections';
 import { useCompanyExpenses } from './hooks/useCompanyExpenses';
 import { projectColorOf } from './lib/projectColor';
 import { Sidebar } from './components/Sidebar';
 import { ProjectsView } from './components/ProjectsView';
+import { ClientsView } from './components/ClientsView';
+import { ProjectCalendarView } from './components/ProjectCalendarView';
 import { CalendarWidget } from './components/CalendarWidget';
 import { BudgetView } from './components/BudgetView';
 import { BillingView } from './components/BillingView';
@@ -52,15 +55,15 @@ const App = () => {
   const { user, authReady, handleLogin, handleLogout } = useAuth();
 
   // --- STATE ---
-  const [activeTab, setActiveTab] = useState('dashboard'); 
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
-  const [projectSubTab, setProjectSubTab] = useState<'budget' | 'calendar'>('budget');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const { companyInfo } = useSettings(user);
 
-  const { projects, handleAddProject: handleAddProjectFor, handleUpdateProjectStatus } = useProjects(user, selectedProjectId, setSelectedProjectId);
+  const { clients, handleAddClient, handleUpdateClient } = useClients(user);
+  const { projects, handleAddProject: handleAddProjectFor, handleUpdateProjectStatus } = useProjects(user, selectedProjectId, setSelectedProjectId, clients, handleAddClient);
   const { events, saveEvent } = useCalendarEvents(user);
   const {
     budgets,
@@ -176,6 +179,8 @@ const App = () => {
         await deleteDoc(doc(db, 'company_expenses', String(id)));
       } else if (type === 'event') {
         await deleteDoc(doc(db, 'calendar_events', String(id)));
+      } else if (type === 'client') {
+        await deleteDoc(doc(db, 'clients', String(id)));
       }
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `${type}/${id}`);
@@ -387,6 +392,8 @@ const App = () => {
               {activeTab === 'company-expenses' && "Gasto Erkiale"}
               {activeTab === 'structure' && "Catálogo"}
               {activeTab === 'projects' && "Listado Proyectos"}
+              {activeTab === 'clients' && "Clientes"}
+              {activeTab === 'project-calendar' && "Calendario Proyecto"}
             </h1>
             <div className="flex items-center gap-3 flex-wrap">
                 <div className="h-1 w-12 rounded-full" style={{background: activeColor}}></div>
@@ -441,52 +448,45 @@ const App = () => {
               )}
               
               {activeTab === 'budgets' && (
-                <div>
-                  <div className="flex gap-10 mb-10 border-b border-slate-200">
-                    <button 
-                      onClick={() => setProjectSubTab('budget')}
-                      className={`pb-5 px-1 text-[11px] font-black uppercase tracking-[0.2em] transition-all relative ${projectSubTab === 'budget' ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
-                    >
-                      Control Financiero
-                      {projectSubTab === 'budget' && <motion.div layoutId="subtab" className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600 rounded-full" />}
-                    </button>
-                    <button 
-                      onClick={() => setProjectSubTab('calendar')}
-                      className={`pb-5 px-1 text-[11px] font-black uppercase tracking-[0.2em] transition-all relative ${projectSubTab === 'calendar' ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
-                    >
-                      Cronograma Obra
-                      {projectSubTab === 'calendar' && <motion.div layoutId="subtab" className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600 rounded-full" />}
-                    </button>
-                  </div>
-                  {projectSubTab === 'budget' ? (
-                    <BudgetView
-                      project={selectedProject}
-                      selectedProjectId={selectedProjectId}
-                      budgets={budgets}
-                      expenses={expenses}
-                      user={user}
-                      handleAddBudgetItemFromCatalog={handleAddBudgetItemFromCatalog}
-                      handleAddAdHocBudgetItem={handleAddAdHocBudgetItem}
-                      setEditingBudgetItem={setEditingBudgetItem}
-                      setDeleteConfirmation={setDeleteConfirmation}
-                      setIsInvoiceVisible={setIsInvoiceVisible}
-                      handleGenerateInvoice={handleGenerateInvoice}
-                      isGeneratingInvoice={isGeneratingInvoice}
-                    />
-                  ) : (
-                    <CalendarWidget
-                      projectId={selectedProjectId}
-                      currentDate={currentDate}
-                      setCurrentDate={setCurrentDate}
-                      events={events}
-                      projects={projects}
-                      activeColor={activeColor}
-                      setAddingEventDate={setAddingEventDate}
-                      setAddingEventProjectId={setAddingEventProjectId}
-                      setEditingEvent={setEditingEvent}
-                    />
-                  )}
-                </div>
+                <BudgetView
+                  project={selectedProject}
+                  selectedProjectId={selectedProjectId}
+                  budgets={budgets}
+                  expenses={expenses}
+                  user={user}
+                  handleAddBudgetItemFromCatalog={handleAddBudgetItemFromCatalog}
+                  handleAddAdHocBudgetItem={handleAddAdHocBudgetItem}
+                  setEditingBudgetItem={setEditingBudgetItem}
+                  setDeleteConfirmation={setDeleteConfirmation}
+                  setIsInvoiceVisible={setIsInvoiceVisible}
+                  handleGenerateInvoice={handleGenerateInvoice}
+                  isGeneratingInvoice={isGeneratingInvoice}
+                />
+              )}
+
+              {activeTab === 'project-calendar' && (
+                <ProjectCalendarView
+                  project={selectedProject}
+                  selectedProjectId={selectedProjectId}
+                  currentDate={currentDate}
+                  setCurrentDate={setCurrentDate}
+                  events={events}
+                  projects={projects}
+                  activeColor={activeColor}
+                  setAddingEventDate={setAddingEventDate}
+                  setAddingEventProjectId={setAddingEventProjectId}
+                  setEditingEvent={setEditingEvent}
+                  setActiveTab={setActiveTab}
+                />
+              )}
+
+              {activeTab === 'clients' && (
+                <ClientsView
+                  clients={clients}
+                  handleAddClient={handleAddClient}
+                  handleUpdateClient={handleUpdateClient}
+                  setDeleteConfirmation={setDeleteConfirmation}
+                />
               )}
 
               {activeTab === 'global-calendar' && (
@@ -546,7 +546,13 @@ const App = () => {
               )}
 
               {activeTab === 'dashboard' && (
-                <DashboardView projects={projects} budgets={budgets} events={events} />
+                <DashboardView
+                  projects={projects}
+                  budgets={budgets}
+                  events={events}
+                  setSelectedProjectId={setSelectedProjectId}
+                  setActiveTab={setActiveTab}
+                />
               )}
 
               {activeTab === 'structure' && <StructureManagerView user={user} />}
@@ -558,6 +564,7 @@ const App = () => {
       <NewProjectModal
         isModalOpen={isModalOpen}
         setIsModalOpen={setIsModalOpen}
+        clients={clients}
         handleAddProject={handleAddProject}
       />
 
