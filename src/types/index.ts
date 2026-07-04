@@ -22,15 +22,26 @@ export interface CompanyInfo {
   email: string;
 }
 
+export type CalendarEventType = 'planning' | 'meeting';
+
+export const ERKIALE_PROJECT_ID = 'erkiale';
+
 export interface CalendarEvent {
   id: number;
   firebaseId?: string;
-  projectId: number;
-  date: string;
-  time: string;
-  worker: string;
+  /** Real project firebaseId, or ERKIALE_PROJECT_ID for company-wide events not tied to a project. */
+  projectId: string;
+  type: CalendarEventType;
   task: string;
+  worker: string;
   status: 'pendiente' | 'urgente';
+  /** Range start (type 'planning') or the single day (type 'meeting'). */
+  startDate: string;
+  /** Range end — only for type 'planning'. */
+  endDate?: string;
+  /** Only for type 'meeting'. */
+  startTime?: string;
+  endTime?: string;
 }
 
 export interface BudgetItem {

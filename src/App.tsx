@@ -39,7 +39,7 @@ import { ScannedExpensePreviewModal } from './components/modals/ScannedExpensePr
 import { InvoicePreviewModal } from './components/modals/InvoicePreviewModal';
 import { NewProjectModal } from './components/modals/NewProjectModal';
 import { db, isAdmin, OperationType, handleFirestoreError } from './lib/firebase';
-import type { CompanyInfo, CalendarEvent, BudgetItem, ExpenseItem } from './types';
+import type { CompanyInfo, CalendarEvent, CalendarEventType, BudgetItem, ExpenseItem } from './types';
 import { DEFAULT_COMPANY, PROJECT_COLORS } from './data/constants';
 
 /**
@@ -61,7 +61,7 @@ const App = () => {
   const { companyInfo } = useSettings(user);
 
   const { projects, handleAddProject: handleAddProjectFor, handleUpdateProjectStatus } = useProjects(user, selectedProjectId, setSelectedProjectId);
-  const { events, saveEvent, handleDragOver, handleDrop } = useCalendarEvents(user);
+  const { events, saveEvent } = useCalendarEvents(user);
   const {
     budgets,
     invoices,
@@ -97,6 +97,7 @@ const App = () => {
   } = useCompanyExpenses(user);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [addingEventDate, setAddingEventDate] = useState<string | null>(null);
+  const [addingEventProjectId, setAddingEventProjectId] = useState<string | null>(null);
   const [editingBudgetItem, setEditingBudgetItem] = useState<BudgetItem | null>(null);
   const [isInvoiceVisible, setIsInvoiceVisible] = useState(false);
   const [editingInvoiceItem, setEditingInvoiceItem] = useState<BudgetItem | null>(null);
@@ -133,12 +134,15 @@ const App = () => {
   const handleSaveEvent = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    const type = formData.get('type') as CalendarEventType;
     const eventData = {
       id: editingEvent?.id || Date.now(),
-      projectId: editingEvent?.projectId || (addingEventDate ? selectedProjectId : (projects[0]?.firebaseId || '')),
-      firebaseProjectId: String(selectedProjectId),
-      date: formData.get('date') as string,
-      time: formData.get('time') as string,
+      projectId: formData.get('projectId') as string,
+      type,
+      startDate: formData.get('startDate') as string,
+      ...(type === 'planning'
+        ? { endDate: formData.get('endDate') as string }
+        : { startTime: formData.get('startTime') as string, endTime: formData.get('endTime') as string }),
       worker: formData.get('worker') as string,
       task: formData.get('task') as string,
       status: formData.get('status') as 'pendiente' | 'urgente'
@@ -147,6 +151,7 @@ const App = () => {
     await saveEvent(eventData, editingEvent?.firebaseId);
     setEditingEvent(null);
     setAddingEventDate(null);
+    setAddingEventProjectId(null);
   };
 
   const confirmDelete = async () => {
@@ -300,7 +305,9 @@ const App = () => {
 
       <CalendarEventModal
         addingEventDate={addingEventDate}
+        addingEventProjectId={addingEventProjectId}
         editingEvent={editingEvent}
+        projects={projects}
         setAddingEventDate={setAddingEventDate}
         setEditingEvent={setEditingEvent}
         setDeleteConfirmation={setDeleteConfirmation}
@@ -474,9 +481,8 @@ const App = () => {
                       events={events}
                       projects={projects}
                       activeColor={activeColor}
-                      handleDragOver={handleDragOver}
-                      handleDrop={handleDrop}
                       setAddingEventDate={setAddingEventDate}
+                      setAddingEventProjectId={setAddingEventProjectId}
                       setEditingEvent={setEditingEvent}
                     />
                   )}
@@ -490,9 +496,8 @@ const App = () => {
                   events={events}
                   projects={projects}
                   activeColor={activeColor}
-                  handleDragOver={handleDragOver}
-                  handleDrop={handleDrop}
                   setAddingEventDate={setAddingEventDate}
+                  setAddingEventProjectId={setAddingEventProjectId}
                   setEditingEvent={setEditingEvent}
                 />
               )}

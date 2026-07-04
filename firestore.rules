@@ -70,10 +70,11 @@ service cloud.firestore {
     }
 
     function isValidCalendarEvent(data) {
-      return data.keys().hasAll(['projectId', 'date', 'task']) &&
-             (data.projectId is string || data.projectId is number) &&
-             data.date is string &&
-             data.task is string && data.task.size() > 0 && data.task.size() <= 500;
+      return data.keys().hasAll(['projectId', 'type', 'task', 'startDate']) &&
+             data.projectId is string &&
+             data.type in ['planning', 'meeting'] &&
+             data.task is string && data.task.size() > 0 && data.task.size() <= 500 &&
+             data.startDate is string;
     }
 
     function incoming() {
