@@ -65,7 +65,7 @@
       the billing tab, including invoice print/PDF
 - [x] 5.5 Extract `ExpensesView` into `src/components/ExpensesView.tsx` with explicit props;
       verify the expenses tab
-- [ ] 5.6 Extract the dashboard and catalog view JSX (currently inline in `App.tsx`'s render)
+- [x] 5.6 Extract the dashboard and catalog view JSX (currently inline in `App.tsx`'s render)
       into `src/components/DashboardView.tsx` and `src/components/CatalogView.tsx`; verify both
       tabs
 - [ ] 5.7 Extract shared modals (delete confirmation, add/edit item forms) into
