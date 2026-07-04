@@ -19,6 +19,7 @@ import { useSettings } from './hooks/useSettings';
 import { useCalendarEvents } from './hooks/useCalendarEvents';
 import { useProjects } from './hooks/useProjects';
 import { useProjectSubcollections } from './hooks/useProjectSubcollections';
+import { useCompanyExpenses } from './hooks/useCompanyExpenses';
 import { projectColorOf } from './lib/projectColor';
 import { Sidebar } from './components/Sidebar';
 import { ProjectsView } from './components/ProjectsView';
@@ -26,6 +27,7 @@ import { CalendarWidget } from './components/CalendarWidget';
 import { BudgetView } from './components/BudgetView';
 import { BillingView } from './components/BillingView';
 import { ExpensesView } from './components/ExpensesView';
+import { CompanyExpensesView } from './components/CompanyExpensesView';
 import { DashboardView } from './components/DashboardView';
 import { StructureManagerView } from './components/StructureManagerView';
 import { ConfirmDeleteModal } from './components/modals/ConfirmDeleteModal';
@@ -80,12 +82,26 @@ const App = () => {
     handleExpenseScan,
     handleConfirmScannedExpense,
   } = useProjectSubcollections(user, selectedProjectId, projects);
+  const {
+    expenses: companyExpenses,
+    handleSaveExpense: handleSaveCompanyExpense,
+    handleUpdateExpenseItem: handleUpdateCompanyExpenseItemFor,
+    isScanningExpense: isScanningCompanyExpense,
+    expenseScanError: companyExpenseScanError,
+    setExpenseScanError: setCompanyExpenseScanError,
+    scannedExpensePreview: scannedCompanyExpensePreview,
+    setScannedExpensePreview: setScannedCompanyExpensePreview,
+    isConfirmingExpense: isConfirmingCompanyExpense,
+    handleExpenseScan: handleCompanyExpenseScan,
+    handleConfirmScannedExpense: handleConfirmScannedCompanyExpense,
+  } = useCompanyExpenses(user);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [addingEventDate, setAddingEventDate] = useState<string | null>(null);
   const [editingBudgetItem, setEditingBudgetItem] = useState<BudgetItem | null>(null);
   const [isInvoiceVisible, setIsInvoiceVisible] = useState(false);
   const [editingInvoiceItem, setEditingInvoiceItem] = useState<BudgetItem | null>(null);
   const [editingExpenseItem, setEditingExpenseItem] = useState<ExpenseItem | null>(null);
+  const [editingCompanyExpenseItem, setEditingCompanyExpenseItem] = useState<ExpenseItem | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ id: any; type: string; label: string } | null>(null);
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
   const [isEditingCompany, setIsEditingCompany] = useState(false);
@@ -107,6 +123,11 @@ const App = () => {
   const handleUpdateExpenseItem = async (e: React.FormEvent<HTMLFormElement>) => {
     await handleUpdateExpenseItemFor(editingExpenseItem, e);
     setEditingExpenseItem(null);
+  };
+
+  const handleUpdateCompanyExpenseItem = async (e: React.FormEvent<HTMLFormElement>) => {
+    await handleUpdateCompanyExpenseItemFor(editingCompanyExpenseItem, e);
+    setEditingCompanyExpenseItem(null);
   };
 
   const handleSaveEvent = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -146,6 +167,8 @@ const App = () => {
         await deleteDoc(doc(db, 'projects', String(selectedProjectId), 'invoice_items', String(id)));
       } else if (type === 'expense') {
         await deleteDoc(doc(db, 'projects', String(selectedProjectId), 'expense_items', String(id)));
+      } else if (type === 'company-expense') {
+        await deleteDoc(doc(db, 'company_expenses', String(id)));
       } else if (type === 'event') {
         await deleteDoc(doc(db, 'calendar_events', String(id)));
       }
@@ -290,6 +313,12 @@ const App = () => {
         handleUpdateExpenseItem={handleUpdateExpenseItem}
       />
 
+      <EditExpenseItemModal
+        editingExpenseItem={editingCompanyExpenseItem}
+        setEditingExpenseItem={setEditingCompanyExpenseItem}
+        handleUpdateExpenseItem={handleUpdateCompanyExpenseItem}
+      />
+
       <EditInvoiceItemModal
         editingInvoiceItem={editingInvoiceItem}
         setEditingInvoiceItem={setEditingInvoiceItem}
@@ -301,6 +330,13 @@ const App = () => {
         setScannedExpensePreview={setScannedExpensePreview}
         isConfirmingExpense={isConfirmingExpense}
         handleConfirmScannedExpense={handleConfirmScannedExpense}
+      />
+
+      <ScannedExpensePreviewModal
+        scannedExpensePreview={scannedCompanyExpensePreview}
+        setScannedExpensePreview={setScannedCompanyExpensePreview}
+        isConfirmingExpense={isConfirmingCompanyExpense}
+        handleConfirmScannedExpense={handleConfirmScannedCompanyExpense}
       />
 
       <InvoicePreviewModal
@@ -341,6 +377,7 @@ const App = () => {
               {activeTab === 'dashboard' && "Panel General"}
               {activeTab === 'billing' && "Módulo Facturación"}
               {activeTab === 'expenses' && "Tickets y Gastos"}
+              {activeTab === 'company-expenses' && "Gasto Erkiale"}
               {activeTab === 'structure' && "Catálogo"}
               {activeTab === 'projects' && "Listado Proyectos"}
             </h1>
@@ -488,6 +525,18 @@ const App = () => {
                   isScanningExpense={isScanningExpense}
                   expenseScanError={expenseScanError}
                   handleExpenseScan={handleExpenseScan}
+                />
+              )}
+
+              {activeTab === 'company-expenses' && (
+                <CompanyExpensesView
+                  expenses={companyExpenses}
+                  setEditingExpenseItem={setEditingCompanyExpenseItem}
+                  setDeleteConfirmation={setDeleteConfirmation}
+                  handleSaveExpense={handleSaveCompanyExpense}
+                  isScanningExpense={isScanningCompanyExpense}
+                  expenseScanError={companyExpenseScanError}
+                  handleExpenseScan={handleCompanyExpenseScan}
                 />
               )}
 

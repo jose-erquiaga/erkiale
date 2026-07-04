@@ -110,6 +110,12 @@ service cloud.firestore {
       }
     }
 
+    match /company_expenses/{itemId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidExpenseItem(incoming());
+      allow delete: if isSignedIn();
+    }
+
     match /calendar_events/{eventId} {
       allow read: if isSignedIn();
       allow create, update: if isSignedIn() && isValidCalendarEvent(incoming());
