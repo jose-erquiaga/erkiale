@@ -176,7 +176,12 @@ export const InvoicePreviewModal = ({
                         {guildGroups.map(g => (
                           <React.Fragment key={g.guildName}>
                             <tr>
-                              <td colSpan={5} className="pt-2 pb-1 pl-2 text-[9px] font-black text-blue-600 uppercase tracking-widest">{g.guildName}</td>
+                              <td colSpan={5} className="pt-2 pb-1 pl-2 text-[9px] font-black text-blue-600 uppercase tracking-widest">
+                                <div className="flex justify-between">
+                                  <span>{g.guildName}</span>
+                                  <span className="text-slate-500">{g.total.toFixed(2)} €</span>
+                                </div>
+                              </td>
                             </tr>
                             {g.rooms.map(r => (
                               <React.Fragment key={r.roomName}>
@@ -186,7 +191,7 @@ export const InvoicePreviewModal = ({
                                 {r.subcategories.map(s => (
                                   <React.Fragment key={s.subcategoryName}>
                                     <tr>
-                                      <td colSpan={5} className="pb-1 pl-6 text-[8px] font-bold text-slate-300 uppercase tracking-widest">{s.subcategoryName}</td>
+                                      <td colSpan={5} className="pb-1 pl-6 text-[9px] font-bold text-slate-500 uppercase tracking-widest">{s.subcategoryName}</td>
                                     </tr>
                                     {s.items.map(item => (
                                       <tr key={item.id} className="border-b border-slate-100">

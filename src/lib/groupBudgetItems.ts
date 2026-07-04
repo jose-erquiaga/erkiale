@@ -12,6 +12,7 @@ export interface RoomGroup {
 
 export interface GuildGroup {
   guildName: string;
+  total: number;
   rooms: RoomGroup[];
 }
 
@@ -47,8 +48,15 @@ export function groupItemsByGuildAndRoom(items: BudgetItem[]): GuildGroup[] {
 
   return guildOrder.map(guildName => {
     const guildEntry = guildMap.get(guildName)!;
+    const total = guildEntry.roomOrder.reduce((roomAcc, roomName) => {
+      const roomEntry = guildEntry.roomMap.get(roomName)!;
+      return roomAcc + roomEntry.subcatOrder.reduce((subAcc, subcategoryName) => {
+        return subAcc + roomEntry.subcatMap.get(subcategoryName)!.reduce((itemAcc, item) => itemAcc + item.total, 0);
+      }, 0);
+    }, 0);
     return {
       guildName,
+      total,
       rooms: guildEntry.roomOrder.map(roomName => {
         const roomEntry = guildEntry.roomMap.get(roomName)!;
         return {
