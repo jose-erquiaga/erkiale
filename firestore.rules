@@ -174,5 +174,22 @@ service cloud.firestore {
         }
       }
     }
+
+    // Collection-group rules: required in addition to the nested rules above
+    // because the app lists 'rooms'/'subcategories'/'items' across every guild
+    // at once (collectionGroup queries) for a flat realtime view of the whole
+    // hierarchy. Firestore only applies a nested `match` rule to queries scoped
+    // to a known parent path; collection-group queries need the `{path=**}`
+    // wildcard form to be granted access at all, so these are additive
+    // (read-only) — they don't loosen the create/update/delete rules above.
+    match /{path=**}/rooms/{roomId} {
+      allow read: if isSignedIn();
+    }
+    match /{path=**}/subcategories/{subcategoryId} {
+      allow read: if isSignedIn();
+    }
+    match /{path=**}/items/{itemId} {
+      allow read: if isSignedIn();
+    }
   }
 }
