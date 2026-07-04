@@ -53,10 +53,7 @@ function BudgetItemRows({ items, setEditingBudgetItem, setDeleteConfirmation }: 
             className="border-b border-slate-50 hover:bg-blue-50/30 transition-all cursor-default group"
           >
             <td className="p-6">
-              <div className="flex flex-col">
-                <span className="text-sm font-bold text-slate-800">{item.concept}</span>
-                <span className="text-[10px] text-slate-400 font-medium uppercase tracking-widest mt-0.5">Código: #{item.id}</span>
-              </div>
+              <span className="text-sm font-bold text-slate-800">{item.concept}</span>
             </td>
             <td className="p-6 text-sm text-slate-600 font-bold text-center">
               <span className="bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">{item.qty} {item.unit}</span>
@@ -115,13 +112,16 @@ function BudgetItemsList({ title, items, setEditingBudgetItem, setDeleteConfirma
       <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-6 pt-6 pb-2">{title}</h5>
       {guildGroups.map(g => (
         <div key={g.guildName}>
-          <p className="px-6 pt-4 pb-1 text-[9px] font-black text-blue-500 uppercase tracking-widest">{g.guildName}</p>
+          <div className="px-6 pt-4 pb-1 flex justify-between items-baseline">
+            <p className="text-[9px] font-black text-blue-500 uppercase tracking-widest">{g.guildName}</p>
+            <p className="text-[10px] font-black text-slate-500">{g.total.toFixed(2)} €</p>
+          </div>
           {g.rooms.map(r => (
             <div key={r.roomName}>
               <p className="px-6 pl-10 pt-1 pb-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest">{r.roomName}</p>
               {r.subcategories.map(s => (
                 <div key={s.subcategoryName}>
-                  <p className="px-6 pl-14 pb-1 text-[8px] font-bold text-slate-300 uppercase tracking-widest">{s.subcategoryName}</p>
+                  <p className="px-6 pl-14 pb-1 text-[9px] font-bold text-slate-500 uppercase tracking-widest">{s.subcategoryName}</p>
                   <BudgetItemRows items={s.items} setEditingBudgetItem={setEditingBudgetItem} setDeleteConfirmation={setDeleteConfirmation} />
                 </div>
               ))}

@@ -154,13 +154,16 @@ function InvoiceItemsTable({ title, items, setEditingInvoiceItem, setDeleteConfi
       <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-6 pt-6 pb-2">{title}</h5>
       {guildGroups.map(g => (
         <div key={g.guildName}>
-          <p className="px-6 pt-4 pb-1 text-[9px] font-black text-emerald-600 uppercase tracking-widest">{g.guildName}</p>
+          <div className="px-6 pt-4 pb-1 flex justify-between items-baseline">
+            <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">{g.guildName}</p>
+            <p className="text-[10px] font-black text-slate-500">{g.total.toFixed(2)} €</p>
+          </div>
           {g.rooms.map(r => (
             <div key={r.roomName}>
               <p className="px-6 pl-10 pt-1 pb-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest">{r.roomName}</p>
               {r.subcategories.map(s => (
                 <div key={s.subcategoryName}>
-                  <p className="px-6 pl-14 pb-1 text-[8px] font-bold text-slate-300 uppercase tracking-widest">{s.subcategoryName}</p>
+                  <p className="px-6 pl-14 pb-1 text-[9px] font-bold text-slate-500 uppercase tracking-widest">{s.subcategoryName}</p>
                   <InvoiceItemRows items={s.items} setEditingInvoiceItem={setEditingInvoiceItem} setDeleteConfirmation={setDeleteConfirmation} />
                 </div>
               ))}
