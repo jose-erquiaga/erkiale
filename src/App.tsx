@@ -72,7 +72,8 @@ const App = () => {
     budgets,
     invoices,
     expenses,
-    handleAddBudgetItem: handleAddBudgetItemFor,
+    handleAddBudgetItemFromCatalog,
+    handleAddAdHocBudgetItem,
     handleUpdateBudgetItem: handleUpdateBudgetItemFor,
     handleGenerateInvoice: handleGenerateInvoiceFor,
     handleUpdateInvoiceItem: handleUpdateInvoiceItemFor,
@@ -81,7 +82,6 @@ const App = () => {
   } = useProjectSubcollections(user, selectedProjectId, projects);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [addingEventDate, setAddingEventDate] = useState<string | null>(null);
-  const [isAddingBudgetItem, setIsAddingBudgetItem] = useState(false);
   const [editingBudgetItem, setEditingBudgetItem] = useState<BudgetItem | null>(null);
   const [editingCatalogItem, setEditingCatalogItem] = useState<CatalogItem | null>(null);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
@@ -148,11 +148,6 @@ const App = () => {
     await saveEvent(eventData, editingEvent?.firebaseId);
     setEditingEvent(null);
     setAddingEventDate(null);
-  };
-
-  const handleAddBudgetItem = async (catalogItemId: string, qty: number) => {
-    const success = await handleAddBudgetItemFor(catalog, catalogItemId, qty);
-    if (success) setIsAddingBudgetItem(false);
   };
 
   const confirmDelete = async () => {
@@ -562,11 +557,9 @@ const App = () => {
                       selectedProjectId={selectedProjectId}
                       budgets={budgets}
                       expenses={expenses}
-                      categories={categories}
-                      catalog={catalog}
-                      isAddingBudgetItem={isAddingBudgetItem}
-                      setIsAddingBudgetItem={setIsAddingBudgetItem}
-                      handleAddBudgetItem={handleAddBudgetItem}
+                      user={user}
+                      handleAddBudgetItemFromCatalog={handleAddBudgetItemFromCatalog}
+                      handleAddAdHocBudgetItem={handleAddAdHocBudgetItem}
                       setEditingBudgetItem={setEditingBudgetItem}
                       setDeleteConfirmation={setDeleteConfirmation}
                       setIsInvoiceVisible={setIsInvoiceVisible}

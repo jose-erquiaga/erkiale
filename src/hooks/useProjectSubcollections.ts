@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { db, isFirebaseConfigured, OperationType, handleFirestoreError } from '../lib/firebase';
-import type { Project, BudgetItem, ExpenseItem, CatalogItem } from '../types';
+import type { Project, BudgetItem, ExpenseItem } from '../types';
+import type { HierarchicalCatalogItem } from '../types/catalogHierarchy';
 
 export function useProjectSubcollections(user: unknown, selectedProjectId: string, projects: Project[]) {
   const [budgets, setBudgets] = useState<Record<number | string, BudgetItem[]>>({});
@@ -49,17 +50,39 @@ export function useProjectSubcollections(user: unknown, selectedProjectId: strin
     };
   }, [user, selectedProjectId, projects]);
 
-  const handleAddBudgetItem = async (catalog: CatalogItem[], catalogItemId: string, qty: number) => {
-    const catalogItem = catalog.find(item => item.firebaseId === catalogItemId);
-    if (!catalogItem) return;
+  const handleAddBudgetItemFromCatalog = async (catalogItem: HierarchicalCatalogItem, qty: number) => {
+    const concept = catalogItem.mode === 'texto_libre'
+      ? (catalogItem.description || '')
+      : `${catalogItem.largo}×${catalogItem.ancho}${catalogItem.alto ? `×${catalogItem.alto}` : ''} (${catalogItem.totalM2} m²)`;
 
     const newItem = {
       id: Date.now(),
-      concept: catalogItem.concept,
-      qty: qty,
+      concept,
+      qty,
       unit: catalogItem.unit,
       price: catalogItem.price,
-      total: qty * catalogItem.price
+      total: qty * catalogItem.price,
+      tipo: catalogItem.type,
+    };
+
+    try {
+      await addDoc(collection(db, 'projects', String(selectedProjectId), 'budget_items'), newItem);
+      return true;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, `projects/${selectedProjectId}/budget_items`);
+      return false;
+    }
+  };
+
+  const handleAddAdHocBudgetItem = async (data: { concept: string; qty: number; unit: string; price: number; tipo: 'tareas' | 'material' }) => {
+    const newItem = {
+      id: Date.now(),
+      concept: data.concept,
+      qty: data.qty,
+      unit: data.unit,
+      price: data.price,
+      total: data.qty * data.price,
+      tipo: data.tipo,
     };
 
     try {
@@ -119,7 +142,8 @@ export function useProjectSubcollections(user: unknown, selectedProjectId: strin
           qty: item.qty,
           unit: item.unit,
           price: item.price,
-          total: item.total
+          total: item.total,
+          tipo: item.tipo,
         });
       }
       return true;
@@ -207,7 +231,8 @@ export function useProjectSubcollections(user: unknown, selectedProjectId: strin
     budgets,
     invoices,
     expenses,
-    handleAddBudgetItem,
+    handleAddBudgetItemFromCatalog,
+    handleAddAdHocBudgetItem,
     handleUpdateBudgetItem,
     handleGenerateInvoice,
     handleUpdateInvoiceItem,
