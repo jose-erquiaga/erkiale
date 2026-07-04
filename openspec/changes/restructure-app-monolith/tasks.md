@@ -68,7 +68,7 @@
 - [x] 5.6 Extract the dashboard and catalog view JSX (currently inline in `App.tsx`'s render)
       into `src/components/DashboardView.tsx` and `src/components/CatalogView.tsx`; verify both
       tabs
-- [ ] 5.7 Extract shared modals (delete confirmation, add/edit item forms) into
+- [x] 5.7 Extract shared modals (delete confirmation, add/edit item forms) into
       `src/components/modals/` if they are not already scoped inside the views above
 
 ## 6. Final cleanup

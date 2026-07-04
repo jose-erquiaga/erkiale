@@ -57,6 +57,15 @@ import { BillingView } from './components/BillingView';
 import { ExpensesView } from './components/ExpensesView';
 import { CatalogView } from './components/CatalogView';
 import { DashboardView } from './components/DashboardView';
+import { ConfirmDeleteModal } from './components/modals/ConfirmDeleteModal';
+import { EditBudgetItemModal } from './components/modals/EditBudgetItemModal';
+import { CalendarEventModal } from './components/modals/CalendarEventModal';
+import { EditExpenseItemModal } from './components/modals/EditExpenseItemModal';
+import { EditInvoiceItemModal } from './components/modals/EditInvoiceItemModal';
+import { EditCatalogItemModal } from './components/modals/EditCatalogItemModal';
+import { ScannedCatalogPreviewModal } from './components/modals/ScannedCatalogPreviewModal';
+import { InvoicePreviewModal } from './components/modals/InvoicePreviewModal';
+import { NewProjectModal } from './components/modals/NewProjectModal';
 import { db, auth, isFirebaseConfigured, isAdmin, OperationType, handleFirestoreError } from './lib/firebase';
 import type { Project, CompanyInfo, CatalogItem, CalendarEvent, BudgetItem, ExpenseItem } from './types';
 import { DEFAULT_COMPANY, DEFAULT_EXPENSE_CATEGORIES, PROJECT_COLORS } from './data/constants';
@@ -486,501 +495,66 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] font-sans selection:bg-blue-100 selection:text-blue-700 flex">
-      {/* MODAL: DELETE CONFIRMATION */}
-      <AnimatePresence>
-        {deleteConfirmation && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setDeleteConfirmation(null)} className="absolute inset-0 bg-[#0F172A]/80 backdrop-blur-sm" />
-            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="bg-white rounded-[2rem] p-10 w-full max-w-md relative z-10 shadow-2xl">
-              <div className="flex flex-col items-center text-center gap-6">
-                <div className="p-4 bg-rose-50 text-rose-500 rounded-full">
-                  <AlertCircle size={48} />
-                </div>
-                <div>
-                  <h3 className="text-xl font-black text-slate-900 mb-2">¿Confirmar eliminación?</h3>
-                  <p className="text-slate-500 text-sm font-medium italic">"{deleteConfirmation.label}"</p>
-                </div>
-                <div className="flex gap-3 w-full">
-                  <button onClick={() => setDeleteConfirmation(null)} className="flex-1 px-6 py-4 rounded-2xl bg-slate-100 text-slate-500 font-black uppercase text-[10px] tracking-widest hover:bg-slate-200 transition-all">Cancelar</button>
-                  <button onClick={confirmDelete} className="flex-1 px-6 py-4 rounded-2xl bg-rose-600 text-white font-black uppercase text-[10px] tracking-widest hover:bg-rose-700 transition-all shadow-lg shadow-rose-100">Eliminar</button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      <ConfirmDeleteModal
+        deleteConfirmation={deleteConfirmation}
+        setDeleteConfirmation={setDeleteConfirmation}
+        confirmDelete={confirmDelete}
+      />
 
-      {/* MODAL: EDIT BUDGET ITEM */}
-      <AnimatePresence>
-        {editingBudgetItem && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
-             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setEditingBudgetItem(null)} className="absolute inset-0 bg-[#0F172A]/80 backdrop-blur-sm" />
-             <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="bg-white rounded-[2.5rem] w-full max-w-md relative z-10 shadow-2xl overflow-hidden">
-                <div className="p-8 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                  <h3 className="text-xl font-black text-slate-900">Editar Partida</h3>
-                  <button onClick={() => setEditingBudgetItem(null)} className="text-slate-400 hover:text-slate-900"><X size={20}/></button>
-                </div>
-                <form onSubmit={handleUpdateBudgetItem} className="p-8 space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Concepto</label>
-                    <input name="concept" defaultValue={editingBudgetItem.concept} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Cantidad ({editingBudgetItem.unit})</label>
-                       <input name="qty" type="number" step="0.01" min="0.01" defaultValue={editingBudgetItem.qty} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
-                    </div>
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Precio Ud (€)</label>
-                       <input name="price" type="number" step="0.01" min="0" defaultValue={editingBudgetItem.price} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
-                    </div>
-                  </div>
-                  <button type="submit" className="w-full bg-blue-600 text-white p-5 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 mt-2">Guardar Cambios</button>
-                </form>
-             </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      <EditBudgetItemModal
+        editingBudgetItem={editingBudgetItem}
+        setEditingBudgetItem={setEditingBudgetItem}
+        handleUpdateBudgetItem={handleUpdateBudgetItem}
+      />
 
-      {/* MODAL: ADD/EDIT CALENDAR EVENT */}
-      <AnimatePresence>
-        {(addingEventDate || editingEvent) && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
-             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { setAddingEventDate(null); setEditingEvent(null); }} className="absolute inset-0 bg-[#0F172A]/80 backdrop-blur-sm" />
-             <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="bg-white rounded-[2.5rem] w-full max-w-md relative z-10 shadow-2xl overflow-hidden">
-                <div className="p-8 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                  <h3 className="text-xl font-black text-slate-900">{editingEvent ? 'Editar Evento' : 'Añadir Evento'}</h3>
-                  <button onClick={() => { setAddingEventDate(null); setEditingEvent(null); }} className="text-slate-400 hover:text-slate-900"><X size={20}/></button>
-                </div>
-                <form onSubmit={handleSaveEvent} className="p-8 space-y-6">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Fecha</label>
-                       <input name="date" type="date" defaultValue={editingEvent?.date || addingEventDate || ''} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Hora</label>
-                         <input name="time" type="time" defaultValue={editingEvent?.time || '08:00'} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
-                      </div>
-                      <div className="space-y-2">
-                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Prioridad</label>
-                         <select name="status" defaultValue={editingEvent?.status || 'pendiente'} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all appearance-none">
-                            <option value="pendiente">Pendiente</option>
-                            <option value="urgente">Urgente</option>
-                         </select>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Responsable / Operario</label>
-                       <input name="worker" defaultValue={editingEvent?.worker || ''} placeholder="Ej: Pintor, Fontanero..." required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
-                    </div>
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Tarea / Descripción</label>
-                       <textarea name="task" defaultValue={editingEvent?.task || ''} placeholder="Describe la tarea..." required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all min-h-[100px]" />
-                    </div>
-                  </div>
-                  <div className="flex gap-4 pt-2">
-                    {editingEvent && (
-                      <button 
-                        type="button" 
-                        onClick={() => { setDeleteConfirmation({ id: editingEvent.firebaseId, type: 'event', label: editingEvent.task }); setEditingEvent(null); }}
-                        className="flex-1 border border-rose-200 text-rose-500 p-5 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-rose-50 transition-all"
-                      >
-                        Eliminar
-                      </button>
-                    )}
-                    <button type="submit" className="flex-[2] bg-slate-900 text-white p-5 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-800 transition-all shadow-xl">
-                      {editingEvent ? 'Guardar Cambios' : 'Añadir al Calendario'}
-                    </button>
-                  </div>
-                </form>
-             </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      <CalendarEventModal
+        addingEventDate={addingEventDate}
+        editingEvent={editingEvent}
+        setAddingEventDate={setAddingEventDate}
+        setEditingEvent={setEditingEvent}
+        setDeleteConfirmation={setDeleteConfirmation}
+        handleSaveEvent={handleSaveEvent}
+      />
 
-      {/* MODAL: EDIT EXPENSE ITEM */}
-      <AnimatePresence>
-        {editingExpenseItem && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
-             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setEditingExpenseItem(null)} className="absolute inset-0 bg-[#0F172A]/80 backdrop-blur-sm" />
-             <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="bg-white rounded-[2.5rem] w-full max-w-md relative z-10 shadow-2xl overflow-hidden">
-                <div className="p-8 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                  <h3 className="text-xl font-black text-slate-900">Editar Gasto</h3>
-                  <button onClick={() => setEditingExpenseItem(null)} className="text-slate-400 hover:text-slate-900"><X size={20}/></button>
-                </div>
-                <form onSubmit={handleUpdateExpenseItem} className="p-8 space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Concepto</label>
-                    <input name="concept" defaultValue={editingExpenseItem.concept} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Categoría</label>
-                       <select name="category" defaultValue={editingExpenseItem.category} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all appearance-none">
-                         {expenseCategories.map(c => <option key={c}>{c}</option>)}
-                       </select>
-                    </div>
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Fecha</label>
-                       <input name="date" type="date" defaultValue={editingExpenseItem.date} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Cant.</label>
-                       <input name="qty" type="number" step="0.01" min="0.01" defaultValue={editingExpenseItem.qty} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
-                    </div>
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Ud.</label>
-                       <input name="unit" defaultValue={editingExpenseItem.unit} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
-                    </div>
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Precio €/u</label>
-                       <input name="price" type="number" step="0.01" min="0" defaultValue={editingExpenseItem.price} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
-                    </div>
-                  </div>
-                  <button type="submit" className="w-full bg-slate-900 text-white p-5 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-800 transition-all shadow-xl shadow-slate-100 mt-2">Guardar Cambios</button>
-                </form>
-             </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      <EditExpenseItemModal
+        editingExpenseItem={editingExpenseItem}
+        setEditingExpenseItem={setEditingExpenseItem}
+        expenseCategories={expenseCategories}
+        handleUpdateExpenseItem={handleUpdateExpenseItem}
+      />
 
-      {/* MODAL: EDIT INVOICE ITEM */}
-      <AnimatePresence>
-        {editingInvoiceItem && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
-             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setEditingInvoiceItem(null)} className="absolute inset-0 bg-[#0F172A]/80 backdrop-blur-sm" />
-             <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="bg-white rounded-[2.5rem] w-full max-w-md relative z-10 shadow-2xl overflow-hidden">
-                <div className="p-8 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                  <h3 className="text-xl font-black text-slate-900">Editar Partida Factura</h3>
-                  <button onClick={() => setEditingInvoiceItem(null)} className="text-slate-400 hover:text-slate-900"><X size={20}/></button>
-                </div>
-                <form onSubmit={handleUpdateInvoiceItem} className="p-8 space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Concepto</label>
-                    <input name="concept" defaultValue={editingInvoiceItem.concept} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Cantidad ({editingInvoiceItem.unit})</label>
-                       <input name="qty" type="number" step="0.01" min="0.01" defaultValue={editingInvoiceItem.qty} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
-                    </div>
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Precio Ud (€)</label>
-                       <input name="price" type="number" step="0.01" min="0" defaultValue={editingInvoiceItem.price} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
-                    </div>
-                  </div>
-                  <button type="submit" className="w-full bg-emerald-600 text-white p-5 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 mt-2">Guardar Cambios Factura</button>
-                </form>
-             </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      <EditInvoiceItemModal
+        editingInvoiceItem={editingInvoiceItem}
+        setEditingInvoiceItem={setEditingInvoiceItem}
+        handleUpdateInvoiceItem={handleUpdateInvoiceItem}
+      />
 
-      {/* MODAL: EDIT CATALOG ITEM */}
-      <AnimatePresence>
-        {editingCatalogItem && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
-             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setEditingCatalogItem(null)} className="absolute inset-0 bg-[#0F172A]/80 backdrop-blur-sm" />
-             <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="bg-white rounded-[2.5rem] w-full max-w-md relative z-10 shadow-2xl overflow-hidden">
-                <div className="p-8 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                  <h3 className="text-xl font-black text-slate-900">Editar Catálogo</h3>
-                  <button onClick={() => setEditingCatalogItem(null)} className="text-slate-400 hover:text-slate-900"><X size={20}/></button>
-                </div>
-                <form onSubmit={handleUpdateCatalogItem} className="p-8 space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Concepto</label>
-                    <input name="concept" defaultValue={editingCatalogItem.concept} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Unidad</label>
-                       <select name="unit" defaultValue={editingCatalogItem.unit} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all appearance-none">
-                          {units.map(u => <option key={u} value={u}>{u}</option>)}
-                       </select>
-                    </div>
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Precio Ud (€)</label>
-                       <input name="price" type="number" step="0.01" min="0" defaultValue={editingCatalogItem.price} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
-                    </div>
-                  </div>
-                  <button type="submit" className="w-full bg-blue-600 text-white p-5 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 mt-2">Actualizar Maestro</button>
-                </form>
-             </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      <EditCatalogItemModal
+        editingCatalogItem={editingCatalogItem}
+        setEditingCatalogItem={setEditingCatalogItem}
+        units={units}
+        handleUpdateCatalogItem={handleUpdateCatalogItem}
+      />
 
-      {/* MODAL: SCANNER CATALOG PREVIEW */}
-      <AnimatePresence>
-        {scannedCatalogPreview && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-[#0F172A]/80 backdrop-blur-md overflow-y-auto">
-            <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 30 }}
-              className="bg-white w-full max-w-4xl rounded-[2rem] shadow-2xl overflow-hidden">
-              <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center">
-                <div>
-                  <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Revisar Items Escaneados</h3>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{scannedCatalogPreview.length} ítems detectados — edita antes de guardar</p>
-                </div>
-                <button onClick={() => setScannedCatalogPreview(null)} className="p-2 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200"><X size={18}/></button>
-              </div>
-              <div className="overflow-x-auto max-h-[60vh] overflow-y-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-50 border-b border-slate-100 sticky top-0">
-                    <tr>
-                      <th className="p-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Concepto</th>
-                      <th className="p-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Categoría</th>
-                      <th className="p-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Unidad</th>
-                      <th className="p-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Precio €</th>
-                      <th className="p-4"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {scannedCatalogPreview.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50/50">
-                        <td className="p-3">
-                          <input value={item.concept} onChange={e => setScannedCatalogPreview(prev => prev!.map((it, i) => i===idx ? {...it, concept: e.target.value} : it))}
-                            className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-blue-100"/>
-                        </td>
-                        <td className="p-3">
-                          <select value={item.category} onChange={e => setScannedCatalogPreview(prev => prev!.map((it, i) => i===idx ? {...it, category: e.target.value} : it))}
-                            className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-blue-100 appearance-none">
-                            {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                            {!categories.includes(item.category) && item.category && <option value={item.category}>{item.category} (nueva)</option>}
-                          </select>
-                        </td>
-                        <td className="p-3">
-                          <select value={item.unit} onChange={e => setScannedCatalogPreview(prev => prev!.map((it, i) => i===idx ? {...it, unit: e.target.value} : it))}
-                            className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-blue-100 appearance-none">
-                            {units.map(u => <option key={u} value={u}>{u}</option>)}
-                            {!units.includes(item.unit) && item.unit && <option value={item.unit}>{item.unit} (nueva)</option>}
-                          </select>
-                        </td>
-                        <td className="p-3">
-                          <input type="number" value={item.price} onChange={e => setScannedCatalogPreview(prev => prev!.map((it, i) => i===idx ? {...it, price: parseFloat(e.target.value)||0} : it))}
-                            className="w-24 p-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-blue-100 text-right"/>
-                        </td>
-                        <td className="p-3 text-center">
-                          <button onClick={() => setScannedCatalogPreview(prev => prev!.filter((_, i) => i !== idx))}
-                            className="p-1.5 text-rose-400 hover:bg-rose-50 rounded-lg transition-colors"><X size={14}/></button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="px-8 py-5 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/30">
-                <button onClick={() => setScannedCatalogPreview(null)}
-                  className="px-6 py-3 rounded-xl border border-slate-200 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-100 transition-all">
-                  Cancelar
-                </button>
-                <button onClick={handleConfirmScannedCatalog} disabled={scannedCatalogPreview.length === 0 || isConfirmingCatalog}
-                  className="px-8 py-3 rounded-xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 disabled:bg-slate-300 disabled:cursor-not-allowed">
-                  {isConfirmingCatalog ? 'Guardando...' : `Guardar ${scannedCatalogPreview.length} ítem${scannedCatalogPreview.length !== 1 ? 's' : ''} en Catálogo`}
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      <ScannedCatalogPreviewModal
+        scannedCatalogPreview={scannedCatalogPreview}
+        setScannedCatalogPreview={setScannedCatalogPreview}
+        categories={categories}
+        units={units}
+        isConfirmingCatalog={isConfirmingCatalog}
+        handleConfirmScannedCatalog={handleConfirmScannedCatalog}
+      />
 
-      {/* MODAL: INVOICE VIEW */}
-      <AnimatePresence>
-        {isInvoiceVisible && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-0 md:p-6 bg-[#0F172A]/80 backdrop-blur-md overflow-y-auto">
-            <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 50 }} className="bg-white w-full max-w-4xl min-h-screen md:min-h-[auto] md:rounded-[2.5rem] shadow-2xl relative">
-              <div className="p-8 border-b flex justify-between items-center sticky top-0 bg-white/80 backdrop-blur z-20 print:hidden md:rounded-t-[2.5rem]">
-                <h3 className="text-sm font-black uppercase tracking-widest">Vista Previa de Factura</h3>
-                <div className="flex gap-2">
-                  <button onClick={() => {
-                    const content = document.getElementById('invoice-content');
-                    if (!content) return;
-                    const pw = window.open('', '_blank', 'width=900,height=700');
-                    if (!pw) return;
-                    const pdoc = pw.document;
-                    pdoc.open();
-                    pdoc.write('<!DOCTYPE html>');
-                    pdoc.close();
-                    pdoc.documentElement.lang = 'es';
-                    const head = pdoc.head;
-                    const meta = pdoc.createElement('meta'); meta.setAttribute('charset', 'UTF-8'); head.appendChild(meta);
-                    const title = pdoc.createElement('title'); title.textContent = 'Erkiale'; head.appendChild(title);
-                    const tw = pdoc.createElement('script'); tw.src = 'https://cdn.tailwindcss.com'; head.appendChild(tw);
-                    const style = pdoc.createElement('style'); style.textContent = '@page{size:A4 portrait;margin:12mm 14mm;}body{font-family:sans-serif;background:white;}'; head.appendChild(style);
-                    pdoc.body.appendChild(content.cloneNode(true));
-                    const trigger = pdoc.createElement('script');
-                    trigger.textContent = 'window.onload=function(){setTimeout(function(){window.print();},1200);};';
-                    pdoc.body.appendChild(trigger);
-                  }} className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase flex items-center gap-2 shadow-lg shadow-blue-100">
-                    <FileText size={14}/> Imprimir / PDF
-                  </button>
-                  <button onClick={() => setIsInvoiceVisible(false)} className="p-2.5 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200 transition-all">
-                    <X size={20}/>
-                  </button>
-                </div>
-              </div>
-              
-              {(() => {
-                const isInvoice = activeTab === 'billing';
-                const docItems = (isInvoice ? invoices : budgets)[selectedProjectId] || [];
-                const baseImponible = docItems.reduce((acc, curr) => acc + curr.total, 0);
-                const iva = baseImponible * 0.21;
-                const total = baseImponible * 1.21;
-                const docYear = new Date().getFullYear();
-                const docNum = String(selectedProject?.id || 0).slice(-4);
-                const docDate = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
-                return (
-                <div id="invoice-content" className="p-12 text-slate-900 bg-white min-h-[29.7cm] font-sans">
-
-                  {/* Header: Logo + Company */}
-                  <div className="flex justify-between items-start mb-8">
-                    {/* EH Logo SVG - recreated from corporate identity */}
-                    <svg viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg" style={{width:'112px',height:'80px',display:'block'}}>
-                      {/* Grey left panel */}
-                      <rect x="12" y="6" width="82" height="128" fill="#cccccc"/>
-                      {/* Navy blue right panel */}
-                      <rect x="94" y="6" width="94" height="128" fill="#1e3a8a"/>
-
-                      {/* E letter — left panel, white fill with dark stroke (outline effect) */}
-                      {/* Vertical bar */}
-                      <rect x="18" y="18" width="13" height="104" fill="white" stroke="#1a1a1a" strokeWidth="1"/>
-                      {/* Top horizontal */}
-                      <rect x="18" y="18" width="58" height="13" fill="white" stroke="#1a1a1a" strokeWidth="1"/>
-                      {/* Middle horizontal (shorter) */}
-                      <rect x="18" y="62" width="44" height="11" fill="white" stroke="#1a1a1a" strokeWidth="1"/>
-                      {/* Bottom horizontal */}
-                      <rect x="18" y="109" width="58" height="13" fill="white" stroke="#1a1a1a" strokeWidth="1"/>
-
-                      {/* H letter — right panel, white on blue */}
-                      {/* Left vertical */}
-                      <rect x="104" y="18" width="13" height="104" fill="white"/>
-                      {/* Right vertical */}
-                      <rect x="165" y="18" width="13" height="104" fill="white"/>
-                      {/* Crossbar */}
-                      <rect x="104" y="62" width="74" height="11" fill="white"/>
-
-                      {/* Corner brackets — outer decorative frame */}
-                      <polyline points="2,22 2,2 22,2" fill="none" stroke="#1a1a1a" strokeWidth="4" strokeLinecap="square"/>
-                      <polyline points="2,118 2,138 22,138" fill="none" stroke="#1a1a1a" strokeWidth="4" strokeLinecap="square"/>
-                      <polyline points="198,22 198,2 178,2" fill="none" stroke="#1a1a1a" strokeWidth="4" strokeLinecap="square"/>
-                      <polyline points="198,118 198,138 178,138" fill="none" stroke="#1a1a1a" strokeWidth="4" strokeLinecap="square"/>
-                    </svg>
-                    <div className="text-right text-[11px] leading-relaxed text-slate-700">
-                      <p className="text-sm font-bold text-slate-900 mb-0.5">{companyInfo.name}</p>
-                      {companyInfo.cif && <p>{companyInfo.cif}</p>}
-                      {companyInfo.address && <p>{companyInfo.address}</p>}
-                      {companyInfo.city && <p>{companyInfo.city}</p>}
-                      {companyInfo.phone && <p>Telf. {companyInfo.phone}</p>}
-                      {companyInfo.email && <p>{companyInfo.email}</p>}
-                    </div>
-                  </div>
-
-                  {/* Thin separator */}
-                  <div className="border-t border-slate-300 mb-8" />
-
-                  {/* Cliente + Factura/Presupuesto */}
-                  <div className="grid grid-cols-2 gap-12 mb-8">
-                    <div>
-                      <p className="text-sm font-bold text-slate-900 mb-3 uppercase">Cliente</p>
-                      <p className="text-[12px] font-black text-slate-900 uppercase mb-1">{selectedProject?.clientName || '—'}</p>
-                      <div className="text-[11px] leading-snug text-slate-700 space-y-0.5">
-                        <p>{selectedProject?.clientCIF || ''}</p>
-                        <p>{selectedProject?.clientAddress || ''}</p>
-                        {selectedProject?.clientEmail && <p className="lowercase">{selectedProject.clientEmail}</p>}
-                        {selectedProject?.clientPhone && <p>{selectedProject.clientPhone}</p>}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-900 mb-3 uppercase">{isInvoice ? 'Factura' : 'Presupuesto'}</p>
-                      <table className="text-[11px] w-full">
-                        <tbody>
-                          <tr>
-                            <td className="text-slate-600 py-0.5 pr-4">Nº de {isInvoice ? 'factura' : 'presupuesto'}</td>
-                            <td className="font-bold text-right">{docYear}/{docNum}</td>
-                          </tr>
-                          <tr>
-                            <td className="text-slate-600 py-0.5 pr-4">Fecha {isInvoice ? 'factura' : 'presupuesto'}</td>
-                            <td className="font-bold text-right">{docDate}</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Blue separator line */}
-                  <div className="h-0.5 bg-blue-500 mb-0" />
-
-                  {/* Items table */}
-                  <table className="w-full text-[11px] mb-8">
-                    <thead>
-                      <tr className="border-b border-slate-200">
-                        <th className="py-3 text-left font-semibold text-slate-600">Conceptos</th>
-                        <th className="py-3 text-right font-semibold text-slate-600 w-16">Cant.</th>
-                        <th className="py-3 text-right font-semibold text-slate-600 w-28">Precio uni.</th>
-                        <th className="py-3 text-right font-semibold text-slate-600 w-16">Imp.</th>
-                        <th className="py-3 text-right font-semibold text-slate-600 w-28">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {docItems.map(item => (
-                        <tr key={item.id} className="border-b border-slate-100">
-                          <td className="py-4 pr-4">
-                            <p className="font-bold text-slate-900 uppercase">{item.concept}</p>
-                            {item.description && (
-                              <p className="text-[10px] text-slate-600 mt-1 leading-snug whitespace-pre-line">{item.description}</p>
-                            )}
-                          </td>
-                          <td className="py-4 text-right text-slate-700">{item.qty.toFixed(2)}</td>
-                          <td className="py-4 text-right text-slate-700">{item.price.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
-                          <td className="py-4 text-right text-slate-700">21%</td>
-                          <td className="py-4 text-right font-bold text-slate-900">{(item.price * item.qty * 1.21).toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-
-                  {/* Blue separator line */}
-                  <div className="h-0.5 bg-blue-500 mb-6" />
-
-                  {/* Totals */}
-                  <div className="flex justify-end mb-12">
-                    <div className="w-72 text-[12px] space-y-1.5">
-                      <div className="flex justify-between">
-                        <span className="text-slate-600">Base Imponible</span>
-                        <span className="font-medium">{baseImponible.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</span>
-                      </div>
-                      <div className="flex justify-between pb-2 border-b border-slate-200">
-                        <span className="text-slate-600">IVA 21%</span>
-                        <span className="font-medium">{iva.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</span>
-                      </div>
-                      <div className="flex justify-between pt-1">
-                        <span className="font-bold text-slate-900">Total</span>
-                        <span className="font-bold text-slate-900">{total.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Payment methods */}
-                  <div className="mb-12 text-[11px]">
-                    <p className="font-semibold text-slate-700 mb-1">Métodos de pago</p>
-                    <p className="text-slate-600">Transferencia bancaria al número de cuenta <span className="font-bold text-slate-900">ES38 0182 1078 8602 0152 6785</span></p>
-                  </div>
-
-                  {/* Footer */}
-                  <div className="flex justify-between items-center text-[10px] text-slate-400 border-t border-slate-100 pt-4">
-                    <span>B92898287</span>
-                    <span>1 / 1</span>
-                  </div>
-                </div>
-                );
-              })()}
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      <InvoicePreviewModal
+        isInvoiceVisible={isInvoiceVisible}
+        setIsInvoiceVisible={setIsInvoiceVisible}
+        activeTab={activeTab}
+        invoices={invoices}
+        budgets={budgets}
+        selectedProjectId={selectedProjectId}
+        selectedProject={selectedProject}
+        companyInfo={companyInfo}
+      />
 
       <Sidebar />
       
@@ -1188,87 +762,11 @@ const App = () => {
         </div>
       </main>
 
-      {/* MODAL: NEW PROJECT */}
-      <AnimatePresence>
-        {isModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsModalOpen(false)}
-              className="absolute inset-0 bg-[#0F172A]/90 backdrop-blur-md"
-            />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-white rounded-[3rem] w-full max-w-xl shadow-2xl overflow-hidden relative z-10 border border-white/20"
-            >
-              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                <div>
-                  <h2 className="text-3xl font-black text-slate-900 tracking-tight">Nuevo Expediente</h2>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Apertura de ficha de obra</p>
-                </div>
-                <button 
-                    onClick={() => setIsModalOpen(false)} 
-                    className="p-3 bg-white text-slate-400 rounded-2xl hover:text-slate-900 transition-all border border-slate-100"
-                >
-                    <X size={24}/>
-                </button>
-              </div>
-              <form onSubmit={handleAddProject} className="p-10 space-y-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Título del Proyecto</label>
-                  <input name="name" required type="text" placeholder="Ej: Reforma Planta 3 Calle Serrano" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-[1.25rem] font-bold text-slate-900 outline-none focus:ring-4 focus:ring-blue-100 transition-all text-sm" />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Nombre Cliente / Empresa</label>
-                    <input name="clientName" required type="text" placeholder="Ej: Juan Pérez" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-[1.25rem] font-bold text-slate-900 outline-none focus:ring-4 focus:ring-blue-100 transition-all text-sm" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">CIF / NIF</label>
-                    <input name="clientCIF" required type="text" placeholder="Ej: 12345678Z" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-[1.25rem] font-bold text-slate-900 outline-none focus:ring-4 focus:ring-blue-100 transition-all text-sm" />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Dirección Fiscal / Obra</label>
-                  <input name="clientAddress" required type="text" placeholder="Calle, Número, CP, Ciudad" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-[1.25rem] font-bold text-slate-900 outline-none focus:ring-4 focus:ring-blue-100 transition-all text-sm" />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Email de Contacto</label>
-                    <input name="clientEmail" required type="email" placeholder="cliente@ejemplo.com" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-[1.25rem] font-bold text-slate-900 outline-none focus:ring-4 focus:ring-blue-100 transition-all text-sm" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Teléfono</label>
-                    <input name="clientPhone" required type="tel" placeholder="Ej: 600000000" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-[1.25rem] font-bold text-slate-900 outline-none focus:ring-4 focus:ring-blue-100 transition-all text-sm" />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Categoría Obra</label>
-                  <select name="category" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-[1.25rem] font-bold text-slate-900 outline-none focus:ring-4 focus:ring-blue-100 transition-all text-sm">
-                    <option value="Vivienda">Vivienda</option>
-                    <option value="Cocina">Cocina</option>
-                    <option value="Baño">Baño</option>
-                    <option value="Local">Local Comercial</option>
-                    <option value="General">General</option>
-                  </select>
-                </div>
-
-                <button type="submit" className="w-full bg-blue-600 text-white p-6 rounded-[1.75rem] font-black uppercase text-xs tracking-[0.3em] shadow-2xl shadow-blue-200 border-b-4 border-blue-800 active:border-b-0 active:translate-y-1 transition-all mt-4">
-                  Confirmar Apertura
-                </button>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      <NewProjectModal
+        isModalOpen={isModalOpen}
+        setIsModalOpen={setIsModalOpen}
+        handleAddProject={handleAddProject}
+      />
 
       <style>{`
         @media print {
