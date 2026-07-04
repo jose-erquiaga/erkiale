@@ -31,6 +31,7 @@ import { BillingView } from './components/BillingView';
 import { ExpensesView } from './components/ExpensesView';
 import { CatalogView } from './components/CatalogView';
 import { DashboardView } from './components/DashboardView';
+import { StructureManagerView } from './components/StructureManagerView';
 import { ConfirmDeleteModal } from './components/modals/ConfirmDeleteModal';
 import { EditBudgetItemModal } from './components/modals/EditBudgetItemModal';
 import { CalendarEventModal } from './components/modals/CalendarEventModal';
@@ -444,6 +445,7 @@ const App = () => {
               {activeTab === 'dashboard' && "Panel General"}
               {activeTab === 'billing' && "Módulo Facturación"}
               {activeTab === 'expenses' && "Tickets y Gastos"}
+              {activeTab === 'structure' && "Gestor de Estructura"}
               {activeTab === 'projects' && "Listado Proyectos"}
             </h1>
             <div className="flex items-center gap-3 flex-wrap">
@@ -626,6 +628,8 @@ const App = () => {
               {activeTab === 'dashboard' && (
                 <DashboardView projects={projects} budgets={budgets} events={events} />
               )}
+
+              {activeTab === 'structure' && <StructureManagerView user={user} />}
             </motion.div>
           </AnimatePresence>
         </div>
