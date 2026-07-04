@@ -165,8 +165,12 @@ export const BudgetView = ({
   const [measureUnidades, setMeasureUnidades] = useState(1);
   const [measureLargo, setMeasureLargo] = useState(0);
   const [measureAncho, setMeasureAncho] = useState(0);
-  const [measureAlto, setMeasureAlto] = useState(0);
   const [saveAdHocToCatalog, setSaveAdHocToCatalog] = useState(false);
+  const [materialEntryMode, setMaterialEntryMode] = useState<'catalog' | 'manual'>('catalog');
+  const [manualConcept, setManualConcept] = useState('');
+  const [manualQty, setManualQty] = useState(1);
+  const [manualUnit, setManualUnit] = useState('');
+  const [manualPrice, setManualPrice] = useState(0);
 
   const sortedGuilds = useMemo(() => [...hierarchy.guilds].sort((a, b) => a.order - b.order), [hierarchy.guilds]);
   const roomsForGuild = useMemo(() => hierarchy.rooms.filter(r => r.guildId === guildId).sort((a, b) => a.order - b.order), [hierarchy.rooms, guildId]);
@@ -217,6 +221,20 @@ export const BudgetView = ({
     const guildName = sortedGuilds.find(g => g.firebaseId === guildId)?.name;
     const success = await handleAddBudgetItemFromCatalog(item, qty, guildName);
     if (success) setIsAddingBudgetItem(false);
+  };
+
+  const handleAddManualMaterial = async () => {
+    const concept = manualConcept.trim();
+    const unit = manualUnit.trim();
+    if (!concept || !unit) return;
+    const success = await handleAddAdHocBudgetItem({ concept, qty: manualQty, unit, price: manualPrice, tipo: 'material' });
+    if (success) {
+      setManualConcept('');
+      setManualQty(1);
+      setManualUnit('');
+      setManualPrice(0);
+      setIsAddingBudgetItem(false);
+    }
   };
 
   const handleAddAdHoc = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -350,7 +368,7 @@ export const BudgetView = ({
                      <div className="md:col-span-2 space-y-2">
                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Tipo</label>
                        <div className="relative">
-                         <select value={type} onChange={e => setType(e.target.value as CatalogType)} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm appearance-none cursor-pointer">
+                         <select value={type} onChange={e => { setType(e.target.value as CatalogType); setMaterialEntryMode('catalog'); }} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm appearance-none cursor-pointer">
                            <option value="tareas">Tareas</option>
                            <option value="material">Material</option>
                          </select>
@@ -366,51 +384,81 @@ export const BudgetView = ({
                          <SelectChevron />
                        </div>
                      </div>
-                     <div className="md:col-span-2 space-y-2">
-                       <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Ítem</label>
-                       <div className="relative">
-                         <select value={selectedCatalogItemId} onChange={e => setSelectedCatalogItemId(e.target.value)} disabled={itemsForSubcategory.length === 0} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm appearance-none disabled:bg-slate-50 cursor-pointer">
-                            {itemsForSubcategory.length > 0 ? itemsForSubcategory.map(item => (
-                                <option key={item.firebaseId} value={item.firebaseId}>{item.description} ({item.price}€/{item.unit})</option>
-                            )) : <option>Sin ítems</option>}
-                         </select>
-                         <SelectChevron />
-                       </div>
-                     </div>
-                     {!isM2Task && (
-                       <div className="md:col-span-1 space-y-2">
-                         <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Cant.</label>
-                         <input type="number" value={addQty} onChange={e => setAddQty(parseFloat(e.target.value) || 1)} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
+                     {type === 'material' && (
+                       <div className="md:col-span-12 flex gap-2">
+                         <button type="button" onClick={() => setMaterialEntryMode('catalog')} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${materialEntryMode === 'catalog' ? 'bg-slate-900 text-white border-slate-900' : 'text-slate-500 bg-white border-slate-200'}`}>Ítem existente</button>
+                         <button type="button" onClick={() => setMaterialEntryMode('manual')} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${materialEntryMode === 'manual' ? 'bg-slate-900 text-white border-slate-900' : 'text-slate-500 bg-white border-slate-200'}`}>Editar manualmente</button>
                        </div>
                      )}
-                     <div className="md:col-span-1">
-                       <button onClick={handleAddFromCatalog} disabled={!selectedCatalogItemId} className="w-full bg-blue-600 text-white p-3 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 disabled:bg-slate-300">
-                         Añadir
-                       </button>
-                     </div>
-                     {isM2Task && (
-                       <div className="md:col-span-12 grid grid-cols-2 md:grid-cols-5 gap-4 items-end bg-white p-4 rounded-xl border border-slate-200">
-                         <div className="space-y-2">
-                           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Unidades</label>
-                           <input type="number" step="1" min="1" value={measureUnidades} onChange={e => setMeasureUnidades(parseFloat(e.target.value) || 1)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
+                     {type === 'material' && materialEntryMode === 'manual' ? (
+                       <>
+                         <div className="md:col-span-4 space-y-2">
+                           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Concepto</label>
+                           <input value={manualConcept} onChange={e => setManualConcept(e.target.value)} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
                          </div>
-                         <div className="space-y-2">
-                           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Longitud (m)</label>
-                           <input type="number" step="0.01" min="0" value={measureLargo} onChange={e => setMeasureLargo(parseFloat(e.target.value) || 0)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
+                         <div className="md:col-span-2 space-y-2">
+                           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Cant.</label>
+                           <input type="number" step="0.01" min="0.01" value={manualQty} onChange={e => setManualQty(parseFloat(e.target.value) || 1)} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
                          </div>
-                         <div className="space-y-2">
-                           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Anchura (m)</label>
-                           <input type="number" step="0.01" min="0" value={measureAncho} onChange={e => setMeasureAncho(parseFloat(e.target.value) || 0)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
+                         <div className="md:col-span-2 space-y-2">
+                           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Unidad</label>
+                           <input value={manualUnit} onChange={e => setManualUnit(e.target.value)} placeholder="ud, m2..." className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
                          </div>
-                         <div className="space-y-2">
-                           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Altura (m, informativo)</label>
-                           <input type="number" step="0.01" min="0" value={measureAlto} onChange={e => setMeasureAlto(parseFloat(e.target.value) || 0)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
+                         <div className="md:col-span-2 space-y-2">
+                           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Precio €/unidad</label>
+                           <input type="number" step="0.01" min="0" value={manualPrice} onChange={e => setManualPrice(parseFloat(e.target.value) || 0)} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
                          </div>
-                         <div className="space-y-1">
-                           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Total m²</p>
-                           <p className="text-lg font-black text-blue-600">{measuredTotalM2.toFixed(2)} m²</p>
+                         <div className="md:col-span-2">
+                           <button onClick={handleAddManualMaterial} disabled={!manualConcept.trim() || !manualUnit.trim()} className="w-full bg-blue-600 text-white p-3 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 disabled:bg-slate-300">
+                             Añadir
+                           </button>
                          </div>
-                       </div>
+                       </>
+                     ) : (
+                       <>
+                         <div className="md:col-span-2 space-y-2">
+                           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Ítem</label>
+                           <div className="relative">
+                             <select value={selectedCatalogItemId} onChange={e => setSelectedCatalogItemId(e.target.value)} disabled={itemsForSubcategory.length === 0} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm appearance-none disabled:bg-slate-50 cursor-pointer">
+                                {itemsForSubcategory.length > 0 ? itemsForSubcategory.map(item => (
+                                    <option key={item.firebaseId} value={item.firebaseId}>{item.description} ({item.price}€/{item.unit})</option>
+                                )) : <option>Sin ítems</option>}
+                             </select>
+                             <SelectChevron />
+                           </div>
+                         </div>
+                         {!isM2Task && (
+                           <div className="md:col-span-1 space-y-2">
+                             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Cant.</label>
+                             <input type="number" value={addQty} onChange={e => setAddQty(parseFloat(e.target.value) || 1)} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
+                           </div>
+                         )}
+                         <div className="md:col-span-1">
+                           <button onClick={handleAddFromCatalog} disabled={!selectedCatalogItemId} className="w-full bg-blue-600 text-white p-3 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 disabled:bg-slate-300">
+                             Añadir
+                           </button>
+                         </div>
+                         {isM2Task && (
+                           <div className="md:col-span-12 grid grid-cols-2 md:grid-cols-4 gap-4 items-end bg-white p-4 rounded-xl border border-slate-200">
+                             <div className="space-y-2">
+                               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Unidades</label>
+                               <input type="number" step="1" min="1" value={measureUnidades} onChange={e => setMeasureUnidades(parseFloat(e.target.value) || 1)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
+                             </div>
+                             <div className="space-y-2">
+                               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Longitud (m)</label>
+                               <input type="number" step="0.01" min="0" value={measureLargo} onChange={e => setMeasureLargo(parseFloat(e.target.value) || 0)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
+                             </div>
+                             <div className="space-y-2">
+                               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Altura/Anchura (m)</label>
+                               <input type="number" step="0.01" min="0" value={measureAncho} onChange={e => setMeasureAncho(parseFloat(e.target.value) || 0)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
+                             </div>
+                             <div className="space-y-1">
+                               <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Total m²</p>
+                               <p className="text-lg font-black text-blue-600">{measuredTotalM2.toFixed(2)} m²</p>
+                             </div>
+                           </div>
+                         )}
+                       </>
                      )}
                   </div>
                 ) : (
