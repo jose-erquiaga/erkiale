@@ -170,7 +170,7 @@ export const InvoicePreviewModal = ({
                       <React.Fragment key={group}>
                         <tr>
                           <td colSpan={5} className="pt-4 pb-1 text-[12px] font-black text-slate-600 uppercase tracking-widest">
-                            {group === 'material' ? 'Material' : 'Tareas a realizar'}
+                            {group === 'material' ? 'Material' : (isInvoice ? 'Tareas realizadas' : 'Tareas a realizar')}
                           </td>
                         </tr>
                         {guildGroups.map(g => (
@@ -196,7 +196,7 @@ export const InvoicePreviewModal = ({
                                     {s.items.map(item => (
                                       <tr key={item.id} className="border-b border-slate-100">
                                         <td className="py-4 pr-4 pl-6">
-                                          <p className="text-[9px] font-medium text-slate-900 uppercase">{item.concept}</p>
+                                          <p className="text-[9px] font-medium text-slate-900">{item.concept}</p>
                                           {item.description && (
                                             <p className="text-[10px] text-slate-600 mt-1 leading-snug whitespace-pre-line">{item.description}</p>
                                           )}

@@ -227,7 +227,7 @@ export const BillingView = ({
           </div>
         ) : (
           <>
-            <InvoiceItemsTable title="Tareas a realizar" items={tareasItems} setEditingInvoiceItem={setEditingInvoiceItem} setDeleteConfirmation={setDeleteConfirmation} />
+            <InvoiceItemsTable title="Tareas realizadas" items={tareasItems} setEditingInvoiceItem={setEditingInvoiceItem} setDeleteConfirmation={setDeleteConfirmation} />
             <InvoiceItemsTable title="Material" items={materialItems} setEditingInvoiceItem={setEditingInvoiceItem} setDeleteConfirmation={setDeleteConfirmation} />
           </>
         )}
