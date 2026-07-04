@@ -40,6 +40,7 @@ import { EditExpenseItemModal } from './components/modals/EditExpenseItemModal';
 import { EditInvoiceItemModal } from './components/modals/EditInvoiceItemModal';
 import { EditCatalogItemModal } from './components/modals/EditCatalogItemModal';
 import { ScannedCatalogPreviewModal } from './components/modals/ScannedCatalogPreviewModal';
+import { ScannedExpensePreviewModal } from './components/modals/ScannedExpensePreviewModal';
 import { InvoicePreviewModal } from './components/modals/InvoicePreviewModal';
 import { NewProjectModal } from './components/modals/NewProjectModal';
 import { db, isAdmin, OperationType, handleFirestoreError } from './lib/firebase';
@@ -79,6 +80,14 @@ const App = () => {
     handleUpdateInvoiceItem: handleUpdateInvoiceItemFor,
     handleSaveExpense,
     handleUpdateExpenseItem: handleUpdateExpenseItemFor,
+    isScanningExpense,
+    expenseScanError,
+    setExpenseScanError,
+    scannedExpensePreview,
+    setScannedExpensePreview,
+    isConfirmingExpense,
+    handleExpenseScan,
+    handleConfirmScannedExpense,
   } = useProjectSubcollections(user, selectedProjectId, projects);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [addingEventDate, setAddingEventDate] = useState<string | null>(null);
@@ -400,6 +409,13 @@ const App = () => {
         handleConfirmScannedCatalog={handleConfirmScannedCatalog}
       />
 
+      <ScannedExpensePreviewModal
+        scannedExpensePreview={scannedExpensePreview}
+        setScannedExpensePreview={setScannedExpensePreview}
+        isConfirmingExpense={isConfirmingExpense}
+        handleConfirmScannedExpense={handleConfirmScannedExpense}
+      />
+
       <InvoicePreviewModal
         isInvoiceVisible={isInvoiceVisible}
         setIsInvoiceVisible={setIsInvoiceVisible}
@@ -617,6 +633,9 @@ const App = () => {
                   setEditingExpenseItem={setEditingExpenseItem}
                   setDeleteConfirmation={setDeleteConfirmation}
                   handleSaveExpense={handleSaveExpense}
+                  isScanningExpense={isScanningExpense}
+                  expenseScanError={expenseScanError}
+                  handleExpenseScan={handleExpenseScan}
                 />
               )}
 

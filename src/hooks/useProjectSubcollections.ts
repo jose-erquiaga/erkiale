@@ -3,11 +3,32 @@ import { collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot } from 'fireb
 import { db, isFirebaseConfigured, OperationType, handleFirestoreError } from '../lib/firebase';
 import type { Project, BudgetItem, ExpenseItem } from '../types';
 import type { HierarchicalCatalogItem } from '../types/catalogHierarchy';
+import { scanExpenseInvoice } from '../services/geminiService';
+
+export interface ScannedExpenseComponentDraft {
+  concept: string;
+  quantity: number;
+  unitPrice: number;
+  price: number;
+}
+
+export interface ScannedExpensePreviewState {
+  provider: string;
+  date: string;
+  tipo: 'material' | 'trabajo';
+  paymentMethod: ExpenseItem['paymentMethod'];
+  components: ScannedExpenseComponentDraft[];
+}
 
 export function useProjectSubcollections(user: unknown, selectedProjectId: string, projects: Project[]) {
   const [budgets, setBudgets] = useState<Record<number | string, BudgetItem[]>>({});
   const [invoices, setInvoices] = useState<Record<number | string, BudgetItem[]>>({});
   const [expenses, setExpenses] = useState<Record<number | string, ExpenseItem[]>>({});
+
+  const [isScanningExpense, setIsScanningExpense] = useState(false);
+  const [expenseScanError, setExpenseScanError] = useState<string | null>(null);
+  const [scannedExpensePreview, setScannedExpensePreview] = useState<ScannedExpensePreviewState | null>(null);
+  const [isConfirmingExpense, setIsConfirmingExpense] = useState(false);
 
   useEffect(() => {
     // CRITICAL: Don't listen for subcollections if no project is selected or if it's the initial "0"
@@ -202,6 +223,73 @@ export function useProjectSubcollections(user: unknown, selectedProjectId: strin
     }
   };
 
+  const handleExpenseScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setIsScanningExpense(true);
+    setExpenseScanError(null);
+
+    try {
+      const scanned = await scanExpenseInvoice(file);
+      setScannedExpensePreview({
+        provider: scanned.provider || '',
+        date: scanned.date || new Date().toISOString().split('T')[0],
+        tipo: 'material',
+        paymentMethod: 'efectivo',
+        components: (scanned.components || []).map(c => {
+          const price = Number(c.price) || 0;
+          const quantity = Number(c.quantity) || 1;
+          const unitPrice = Number(c.unitPrice) || price;
+          return { concept: c.concept || '', quantity, unitPrice, price };
+        }),
+      });
+    } catch (error) {
+      console.error("Expense Scan Error:", error);
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes('429') || msg.toLowerCase().includes('quota')) {
+        setExpenseScanError("Cuota de IA agotada. Has superado el límite gratuito de Gemini. Espera un momento o revisa tu plan en ai.google.dev.");
+      } else {
+        setExpenseScanError("No se pudo analizar la factura. Inténtalo de nuevo o cárgala manualmente.");
+      }
+    } finally {
+      setIsScanningExpense(false);
+    }
+  };
+
+  const handleConfirmScannedExpense = async () => {
+    if (!scannedExpensePreview) return;
+    setIsConfirmingExpense(true);
+    try {
+      let saved = 0;
+      for (const component of scannedExpensePreview.components) {
+        const { tipo, date, provider, paymentMethod } = scannedExpensePreview;
+        const total = component.price;
+        const base = Math.round((total / 1.21) * 100) / 100;
+        const iva = Math.round((total - base) * 100) / 100;
+        const data = {
+          id: Date.now() + Math.random(),
+          tipo,
+          date,
+          provider,
+          concept: component.concept,
+          ...(tipo === 'material' ? { base, iva } : { amount: total }),
+          total,
+          paymentMethod,
+        };
+        try {
+          await addDoc(collection(db, 'projects', String(selectedProjectId), 'expense_items'), data);
+          saved++;
+        } catch {
+          // continue saving remaining components
+        }
+      }
+      if (saved > 0) setScannedExpensePreview(null);
+    } finally {
+      setIsConfirmingExpense(false);
+    }
+  };
+
   const handleUpdateExpenseItem = async (editingExpenseItem: ExpenseItem | null, e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editingExpenseItem || !editingExpenseItem.firebaseId) return;
@@ -238,5 +326,13 @@ export function useProjectSubcollections(user: unknown, selectedProjectId: strin
     handleUpdateInvoiceItem,
     handleSaveExpense,
     handleUpdateExpenseItem,
+    isScanningExpense,
+    expenseScanError,
+    setExpenseScanError,
+    scannedExpensePreview,
+    setScannedExpensePreview,
+    isConfirmingExpense,
+    handleExpenseScan,
+    handleConfirmScannedExpense,
   };
 }
