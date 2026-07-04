@@ -196,7 +196,7 @@ export const InvoicePreviewModal = ({
                                     {s.items.map(item => (
                                       <tr key={item.id} className="border-b border-slate-100">
                                         <td className="py-4 pr-4 pl-6">
-                                          <p className="text-[9px] font-medium text-slate-900 uppercase">{item.concept}</p>
+                                          <p className="text-[9px] font-medium text-slate-900">{item.concept}</p>
                                           {item.description && (
                                             <p className="text-[10px] text-slate-600 mt-1 leading-snug whitespace-pre-line">{item.description}</p>
                                           )}
