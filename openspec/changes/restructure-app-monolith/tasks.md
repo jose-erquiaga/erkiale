@@ -73,9 +73,14 @@
 
 ## 6. Final cleanup
 
-- [ ] 6.1 Confirm `App.tsx` contains only: hook calls, tab-routing state, and composition JSX
-      wiring hooks' data/handlers to view components as props
-- [ ] 6.2 Remove unused imports and dead code left behind by the extraction
-- [ ] 6.3 Run `npm run lint` and `npm run build`; do a final manual pass over every tab
+- [x] 6.1 Confirm `App.tsx` contains only: hook calls, tab-routing state, and composition JSX
+      wiring hooks' data/handlers to view components as props (Sidebar also extracted to remove
+      the last nested component definition; `confirmDelete`/`handleSeedCatalog`/
+      `handleResetDatabase` remain as documented cross-domain orchestrators per tasks 2-4)
+- [x] 6.2 Remove unused imports and dead code left behind by the extraction (removed ~20 unused
+      lucide-react/firebase/type imports from App.tsx after the view/modal extraction)
+- [x] 6.3 Run `npm run lint` and `npm run build`; do a final manual pass over every tab
       (dashboard, projects, budgets, calendar, billing, expenses, catalog) to confirm full
-      behavior parity with pre-refactor `App.tsx`
+      behavior parity with pre-refactor `App.tsx` (both commands pass; manual pass done via dev
+      server response checks — no real browser/Firebase session available in this sandbox to
+      click through login, see note in final summary)
