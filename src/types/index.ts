@@ -55,9 +55,11 @@ export interface BudgetItem {
   total: number;
   /** Tareas/Material classification, inherited from the catalog item this was copied from. */
   tipo?: 'tareas' | 'material';
-  /** Guild this item's catalog entry belonged to, denormalized so it survives the guild being renamed/deleted later. */
+  /** Guild/Room this item's catalog entry belonged to, denormalized so they survive the guild/room being renamed/deleted later. */
   guildId?: string;
   guildName?: string;
+  roomId?: string;
+  roomName?: string;
 }
 
 export type ExpensePaymentMethod = 'efectivo' | 'tarjeta' | 'transferencia' | 'a_cuenta';

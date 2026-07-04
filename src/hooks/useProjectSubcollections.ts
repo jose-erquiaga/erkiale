@@ -71,7 +71,7 @@ export function useProjectSubcollections(user: unknown, selectedProjectId: strin
     };
   }, [user, selectedProjectId, projects]);
 
-  const handleAddBudgetItemFromCatalog = async (catalogItem: HierarchicalCatalogItem, qty: number, guildName?: string) => {
+  const handleAddBudgetItemFromCatalog = async (catalogItem: HierarchicalCatalogItem, qty: number, guildName?: string, roomName?: string) => {
     const newItem = {
       id: Date.now(),
       concept: catalogItem.description,
@@ -81,7 +81,9 @@ export function useProjectSubcollections(user: unknown, selectedProjectId: strin
       total: qty * catalogItem.price,
       tipo: catalogItem.type,
       guildId: catalogItem.guildId,
+      roomId: catalogItem.roomId,
       ...(guildName ? { guildName } : {}),
+      ...(roomName ? { roomName } : {}),
     };
 
     try {
@@ -93,7 +95,7 @@ export function useProjectSubcollections(user: unknown, selectedProjectId: strin
     }
   };
 
-  const handleAddAdHocBudgetItem = async (data: { concept: string; qty: number; unit: string; price: number; tipo: 'tareas' | 'material'; guildId?: string; guildName?: string }) => {
+  const handleAddAdHocBudgetItem = async (data: { concept: string; qty: number; unit: string; price: number; tipo: 'tareas' | 'material'; guildId?: string; guildName?: string; roomId?: string; roomName?: string }) => {
     const newItem = {
       id: Date.now(),
       concept: data.concept,
@@ -104,6 +106,8 @@ export function useProjectSubcollections(user: unknown, selectedProjectId: strin
       tipo: data.tipo,
       ...(data.guildId ? { guildId: data.guildId } : {}),
       ...(data.guildName ? { guildName: data.guildName } : {}),
+      ...(data.roomId ? { roomId: data.roomId } : {}),
+      ...(data.roomName ? { roomName: data.roomName } : {}),
     };
 
     try {
@@ -165,6 +169,10 @@ export function useProjectSubcollections(user: unknown, selectedProjectId: strin
           price: item.price,
           total: item.total,
           tipo: item.tipo,
+          ...(item.guildId ? { guildId: item.guildId } : {}),
+          ...(item.guildName ? { guildName: item.guildName } : {}),
+          ...(item.roomId ? { roomId: item.roomId } : {}),
+          ...(item.roomName ? { roomName: item.roomName } : {}),
         });
       }
       return true;

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { doc, setDoc } from 'firebase/firestore';
 import type { Project, BudgetItem, CompanyInfo } from '../types';
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
+import { groupItemsByGuildAndRoom } from '../lib/groupBudgetItems';
 
 interface BillingViewProps {
   project: Project;
@@ -93,6 +94,53 @@ function CompanyInfoCard({ companyInfo, isEditingCompany, setIsEditingCompany, c
   );
 }
 
+function InvoiceItemRows({ items, setEditingInvoiceItem, setDeleteConfirmation }: {
+  items: BudgetItem[];
+  setEditingInvoiceItem: (item: BudgetItem | null) => void;
+  setDeleteConfirmation: (value: { id: any; type: string; label: string } | null) => void;
+}) {
+  return (
+    <table className="w-full text-left border-collapse">
+      <tbody>
+        {items.map((item, idx) => (
+          <motion.tr
+            key={item.id}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: idx * 0.05 }}
+            className="border-b border-slate-50 hover:bg-emerald-50/10 transition-all cursor-default group"
+          >
+            <td className="p-6">
+              <span className="text-sm font-bold text-slate-800">{item.concept}</span>
+            </td>
+            <td className="p-6 text-sm text-slate-600 font-bold text-center">
+              <span className="bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">{item.qty} {item.unit}</span>
+            </td>
+            <td className="p-6 text-sm text-slate-500 font-medium text-right">{item.price.toFixed(2)}€</td>
+            <td className="p-6 text-sm font-black text-slate-900 text-right">{item.total.toFixed(2)}€</td>
+            <td className="p-6 text-right">
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => setEditingInvoiceItem(item)}
+                    className="p-2 text-blue-500 hover:bg-blue-100 rounded-xl transition-colors bg-blue-50/50"
+                  >
+                    <Hammer size={14}/>
+                  </button>
+                  <button
+                    onClick={() => setDeleteConfirmation({ id: item.firebaseId, type: 'invoice', label: item.concept })}
+                    className="p-2 text-rose-500 hover:bg-rose-100 rounded-xl transition-colors bg-rose-50/50"
+                  >
+                    <X size={14}/>
+                  </button>
+                </div>
+            </td>
+          </motion.tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 function InvoiceItemsTable({ title, items, setEditingInvoiceItem, setDeleteConfirmation }: {
   title: string;
   items: BudgetItem[];
@@ -100,47 +148,21 @@ function InvoiceItemsTable({ title, items, setEditingInvoiceItem, setDeleteConfi
   setDeleteConfirmation: (value: { id: any; type: string; label: string } | null) => void;
 }) {
   if (items.length === 0) return null;
+  const guildGroups = groupItemsByGuildAndRoom(items);
   return (
     <div>
       <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-6 pt-6 pb-2">{title}</h5>
-      <table className="w-full text-left border-collapse">
-        <tbody>
-          {items.map((item, idx) => (
-            <motion.tr
-              key={item.id}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: idx * 0.05 }}
-              className="border-b border-slate-50 hover:bg-emerald-50/10 transition-all cursor-default group"
-            >
-              <td className="p-6">
-                <span className="text-sm font-bold text-slate-800">{item.concept}</span>
-              </td>
-              <td className="p-6 text-sm text-slate-600 font-bold text-center">
-                <span className="bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">{item.qty} {item.unit}</span>
-              </td>
-              <td className="p-6 text-sm text-slate-500 font-medium text-right">{item.price.toFixed(2)}€</td>
-              <td className="p-6 text-sm font-black text-slate-900 text-right">{item.total.toFixed(2)}€</td>
-              <td className="p-6 text-right">
-                  <div className="flex justify-end gap-2">
-                    <button
-                      onClick={() => setEditingInvoiceItem(item)}
-                      className="p-2 text-blue-500 hover:bg-blue-100 rounded-xl transition-colors bg-blue-50/50"
-                    >
-                      <Hammer size={14}/>
-                    </button>
-                    <button
-                      onClick={() => setDeleteConfirmation({ id: item.firebaseId, type: 'invoice', label: item.concept })}
-                      className="p-2 text-rose-500 hover:bg-rose-100 rounded-xl transition-colors bg-rose-50/50"
-                    >
-                      <X size={14}/>
-                    </button>
-                  </div>
-              </td>
-            </motion.tr>
+      {guildGroups.map(g => (
+        <div key={g.guildName}>
+          <p className="px-6 pt-4 pb-1 text-[9px] font-black text-emerald-600 uppercase tracking-widest">{g.guildName}</p>
+          {g.rooms.map(r => (
+            <div key={r.roomName}>
+              <p className="px-6 pl-10 pt-1 pb-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest">{r.roomName}</p>
+              <InvoiceItemRows items={r.items} setEditingInvoiceItem={setEditingInvoiceItem} setDeleteConfirmation={setDeleteConfirmation} />
+            </div>
           ))}
-        </tbody>
-      </table>
+        </div>
+      ))}
     </div>
   );
 }
