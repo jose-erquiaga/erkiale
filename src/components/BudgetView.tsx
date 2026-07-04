@@ -408,7 +408,7 @@ export const BudgetView = ({
                          </div>
                          <div className="md:col-span-2 space-y-2">
                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Precio €/unidad</label>
-                           <input type="number" step="0.01" min="0" value={manualPrice} onChange={e => setManualPrice(parseFloat(e.target.value) || 0)} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
+                           <input type="number" step="0.01" min="0" value={manualPrice} onChange={e => setManualPrice(parseFloat(e.target.value) || 0)} onFocus={e => e.target.select()} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
                          </div>
                          <div className="md:col-span-2">
                            <button onClick={handleAddManualMaterial} disabled={!manualConcept.trim() || !manualUnit.trim()} className="w-full bg-blue-600 text-white p-3 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 disabled:bg-slate-300">
@@ -448,11 +448,11 @@ export const BudgetView = ({
                              </div>
                              <div className="space-y-2">
                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Longitud (m)</label>
-                               <input type="number" step="0.01" min="0" value={measureLargo} onChange={e => setMeasureLargo(parseFloat(e.target.value) || 0)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
+                               <input type="number" step="0.5" min="0" value={measureLargo} onChange={e => setMeasureLargo(parseFloat(e.target.value) || 0)} onFocus={e => e.target.select()} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
                              </div>
                              <div className="space-y-2">
                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Altura/Anchura (m)</label>
-                               <input type="number" step="0.01" min="0" value={measureAncho} onChange={e => setMeasureAncho(parseFloat(e.target.value) || 0)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
+                               <input type="number" step="0.5" min="0" value={measureAncho} onChange={e => setMeasureAncho(parseFloat(e.target.value) || 0)} onFocus={e => e.target.select()} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
                              </div>
                              <div className="space-y-1">
                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Total m²</p>
