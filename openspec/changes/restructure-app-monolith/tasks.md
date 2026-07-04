@@ -55,9 +55,9 @@
 
 ## 5. View components
 
-- [ ] 5.1 Extract `ProjectsView` into `src/components/ProjectsView.tsx`, converting closure reads
+- [x] 5.1 Extract `ProjectsView` into `src/components/ProjectsView.tsx`, converting closure reads
       into explicit props; verify the projects list tab
-- [ ] 5.2 Extract `CalendarWidget` into `src/components/CalendarWidget.tsx` with explicit props;
+- [x] 5.2 Extract `CalendarWidget` into `src/components/CalendarWidget.tsx` with explicit props;
       verify the company-wide and per-project calendar tabs
 - [ ] 5.3 Extract `BudgetView` into `src/components/BudgetView.tsx` with explicit props; verify
       the budget tab

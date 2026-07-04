@@ -49,6 +49,9 @@ import { useCatalog } from './hooks/useCatalog';
 import { useCalendarEvents } from './hooks/useCalendarEvents';
 import { useProjects } from './hooks/useProjects';
 import { useProjectSubcollections } from './hooks/useProjectSubcollections';
+import { projectColorOf, getProjectColor } from './lib/projectColor';
+import { ProjectsView } from './components/ProjectsView';
+import { CalendarWidget } from './components/CalendarWidget';
 import { db, auth, isFirebaseConfigured, isAdmin, OperationType, handleFirestoreError } from './lib/firebase';
 import type { Project, CompanyInfo, CatalogItem, CalendarEvent, BudgetItem, ExpenseItem } from './types';
 import { DEFAULT_COMPANY, DEFAULT_EXPENSE_CATEGORIES, PROJECT_COLORS } from './data/constants';
@@ -310,16 +313,7 @@ const App = () => {
 
   const selectedProject = projects.find(p => p.firebaseId === selectedProjectId) || projects[0] || null;
 
-  // Stable color per project: stored in Firestore; fallback uses project.id (stable timestamp) for old projects
-  const projectColorOf = (p: Project) =>
-    p.color || PROJECT_COLORS[p.id % PROJECT_COLORS.length];
-
   const activeColor = selectedProject ? projectColorOf(selectedProject) : PROJECT_COLORS[0];
-
-  const getProjectColor = (projFirebaseId: string) => {
-    const proj = projects.find(p => p.firebaseId === projFirebaseId || String(p.id) === projFirebaseId);
-    return proj ? projectColorOf(proj) : PROJECT_COLORS[0];
-  };
 
   // --- COMPONENTS ---
 
@@ -435,190 +429,6 @@ const App = () => {
       </nav>
     </div>
   );
-
-  const ProjectsView = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-      {projects.map((project, idx) => {
-        const projColor = projectColorOf(project);
-        const isSelected = selectedProjectId === project.firebaseId;
-        return (
-        <motion.div
-          key={project.id}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: idx * 0.1 }}
-          onClick={() => setSelectedProjectId(project.firebaseId || '')}
-          className="group bg-white rounded-[2.5rem] border transition-all duration-500 p-8 flex flex-col justify-between cursor-pointer hover:shadow-2xl hover:-translate-y-2"
-          style={{
-            borderColor: isSelected ? projColor : '#f1f5f9',
-            boxShadow: isSelected ? `0 0 0 4px ${projColor}20, 0 20px 40px ${projColor}15` : undefined,
-          }}
-        >
-          <div>
-            <div className="flex justify-between items-start mb-6">
-              <div
-                className="p-4 rounded-[1.5rem] transition-colors"
-                style={{
-                  backgroundColor: isSelected ? projColor : `${projColor}15`,
-                  color: isSelected ? 'white' : projColor,
-                }}
-              >
-                <Briefcase size={28} />
-              </div>
-              <div className="flex flex-col items-end gap-2">
-                <select
-                  value={project.status}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) => handleUpdateProjectStatus(project.id, e.target.value as any)}
-                  className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full ring-1 outline-none cursor-pointer appearance-none text-center ${
-                    project.status === 'En curso' ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' :
-                    project.status === 'Pendiente' ? 'bg-slate-50 text-slate-600 ring-slate-100' :
-                    'bg-slate-50 text-slate-400 ring-slate-100'
-                  }`}
-                >
-                  <option value="Pendiente">Pendiente</option>
-                  <option value="En curso">En curso</option>
-                  <option value="Finalizado">Finalizado</option>
-                </select>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDeleteConfirmation({ id: project.firebaseId, type: 'project', label: project.name });
-                  }}
-                  className="p-2 text-slate-300 hover:text-rose-500 transition-colors"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            </div>
-            <h3
-              className="text-2xl font-black text-slate-900 mb-2 leading-tight transition-colors"
-              style={isSelected ? {color: projColor} : {}}
-            >
-              {project.name}
-            </h3>
-            <div className="flex items-center gap-2 text-slate-500 text-sm font-medium mb-8">
-              <User size={14} /> {project.clientName}
-            </div>
-          </div>
-
-          <div className="pt-8 border-t border-slate-50 flex items-center justify-between mt-auto">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full" style={{background: projColor}} />
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">{project.category}</span>
-            </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedProjectId(project.firebaseId || '');
-                setActiveTab('budgets');
-              }}
-              className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all"
-              style={{color: projColor}}
-            >
-              Detalles <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-            </button>
-          </div>
-        </motion.div>
-        );
-      })}
-    </div>
-  );
-
-  const CalendarWidget = ({ projectId = null }: { projectId?: string | null }) => {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const firstDay = new Date(year, month, 1).getDay();
-    const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-
-    const filteredEvents = projectId
-      ? events.filter(e => e.projectId === projectId)
-      : events;
-
-    const cells = [];
-    for (let i = 0; i < firstDay; i++) {
-        cells.push(<div key={`empty-${i}`} className="h-32 bg-slate-50/50 border border-slate-100/50"></div>);
-    }
-    
-    for (let d = 1; d <= daysInMonth; d++) {
-      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const dayEvents = filteredEvents.filter(e => e.date === dateStr);
-
-      cells.push(
-        <div 
-          key={d} 
-          onDragOver={handleDragOver}
-          onDrop={(e) => handleDrop(e, dateStr)}
-          onClick={() => setAddingEventDate(dateStr)}
-          className="h-32 border border-slate-100 p-2 hover:bg-slate-50/60 transition-all relative group cursor-pointer"
-        >
-          <div className="flex justify-between items-center mb-1">
-            {new Date().toISOString().split('T')[0] === dateStr ? (
-              <span className="text-[10px] font-black text-white w-5 h-5 flex items-center justify-center rounded-full" style={{background: activeColor}}>{d}</span>
-            ) : (
-              <span className="text-[10px] font-black text-slate-300 group-hover:text-slate-600">{d}</span>
-            )}
-            <Plus size={10} className="text-slate-200 group-hover:text-slate-400" />
-          </div>
-          <div className="space-y-1 overflow-y-auto max-h-[80px] custom-scrollbar">
-            {dayEvents.map(ev => {
-              const evColor = getProjectColor(String(ev.projectId));
-              return (
-                <motion.div
-                  key={ev.id}
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData('text/plain', ev.id.toString());
-                    e.dataTransfer.effectAllowed = 'move';
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setEditingEvent(ev);
-                  }}
-                  initial={{ scale: 0.95 }}
-                  animate={{ scale: 1 }}
-                  className="text-[8px] p-1.5 rounded-lg truncate shadow-sm font-bold border-l-2 cursor-grab active:cursor-grabbing"
-                  style={{
-                    backgroundColor: `${evColor}18`,
-                    color: evColor,
-                    borderLeftColor: ev.status === 'urgente' ? '#EF4444' : evColor,
-                  }}
-                >
-                  <div className="flex justify-between items-center mb-0.5 pointer-events-none">
-                    <span className="truncate flex-1">{ev.worker}</span>
-                    <span className="opacity-60 ml-1 shrink-0">{ev.time}</span>
-                  </div>
-                  <div className="opacity-90 truncate pointer-events-none">{ev.task}</div>
-                </motion.div>
-              );
-            })}
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden">
-        <div className="p-8 border-b flex justify-between items-center bg-white">
-          <div>
-            <h3 className="text-2xl font-black text-slate-900 tracking-tight">{monthNames[month]} {year}</h3>
-            <p className="text-slate-400 text-xs font-medium uppercase tracking-widest mt-1">Planificación Operativa</p>
-          </div>
-          <div className="flex gap-3">
-            <button onClick={() => setCurrentDate(new Date(year, month - 1))} className="p-3 hover:bg-slate-50 rounded-2xl transition border border-slate-100 text-slate-600 shadow-sm"><ChevronLeft size={20}/></button>
-            <button onClick={() => setCurrentDate(new Date(year, month + 1))} className="p-3 hover:bg-slate-50 rounded-2xl transition border border-slate-100 text-slate-600 shadow-sm"><ChevronRight size={20}/></button>
-          </div>
-        </div>
-        <div className="grid grid-cols-7 text-center bg-slate-50/50 border-b border-slate-100">
-          {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(d => (
-            <div key={d} className="py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">{d}</div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7">{cells}</div>
-      </div>
-    );
-  };
 
   const BudgetView = ({ project }: { project: Project }) => {
     if (!project) return <div className="p-12 text-center text-slate-400 italic">No hay ningún proyecto seleccionado.</div>;
@@ -1712,7 +1522,16 @@ const App = () => {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.3 }}
             >
-              {activeTab === 'projects' && <ProjectsView />}
+              {activeTab === 'projects' && (
+                <ProjectsView
+                  projects={projects}
+                  selectedProjectId={selectedProjectId}
+                  setSelectedProjectId={setSelectedProjectId}
+                  setActiveTab={setActiveTab}
+                  handleUpdateProjectStatus={handleUpdateProjectStatus}
+                  setDeleteConfirmation={setDeleteConfirmation}
+                />
+              )}
               
               {activeTab === 'catalog' && (
                 <div className="space-y-8 max-w-6xl mx-auto">
@@ -2133,11 +1952,36 @@ const App = () => {
                       {projectSubTab === 'calendar' && <motion.div layoutId="subtab" className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600 rounded-full" />}
                     </button>
                   </div>
-                  {projectSubTab === 'budget' ? <BudgetView project={selectedProject} /> : <CalendarWidget projectId={selectedProjectId} />}
+                  {projectSubTab === 'budget' ? <BudgetView project={selectedProject} /> : (
+                    <CalendarWidget
+                      projectId={selectedProjectId}
+                      currentDate={currentDate}
+                      setCurrentDate={setCurrentDate}
+                      events={events}
+                      projects={projects}
+                      activeColor={activeColor}
+                      handleDragOver={handleDragOver}
+                      handleDrop={handleDrop}
+                      setAddingEventDate={setAddingEventDate}
+                      setEditingEvent={setEditingEvent}
+                    />
+                  )}
                 </div>
               )}
 
-              {activeTab === 'global-calendar' && <CalendarWidget />}
+              {activeTab === 'global-calendar' && (
+                <CalendarWidget
+                  currentDate={currentDate}
+                  setCurrentDate={setCurrentDate}
+                  events={events}
+                  projects={projects}
+                  activeColor={activeColor}
+                  handleDragOver={handleDragOver}
+                  handleDrop={handleDrop}
+                  setAddingEventDate={setAddingEventDate}
+                  setEditingEvent={setEditingEvent}
+                />
+              )}
 
               {activeTab === 'billing' && <BillingView project={selectedProject} />}
 
