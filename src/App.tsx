@@ -32,6 +32,7 @@ import { ExpensesView } from './components/ExpensesView';
 import { CatalogView } from './components/CatalogView';
 import { DashboardView } from './components/DashboardView';
 import { StructureManagerView } from './components/StructureManagerView';
+import { CatalogHierarchyView } from './components/CatalogHierarchyView';
 import { ConfirmDeleteModal } from './components/modals/ConfirmDeleteModal';
 import { EditBudgetItemModal } from './components/modals/EditBudgetItemModal';
 import { CalendarEventModal } from './components/modals/CalendarEventModal';
@@ -446,6 +447,7 @@ const App = () => {
               {activeTab === 'billing' && "Módulo Facturación"}
               {activeTab === 'expenses' && "Tickets y Gastos"}
               {activeTab === 'structure' && "Gestor de Estructura"}
+              {activeTab === 'catalog-hierarchy' && "Catálogo Jerárquico"}
               {activeTab === 'projects' && "Listado Proyectos"}
             </h1>
             <div className="flex items-center gap-3 flex-wrap">
@@ -630,6 +632,8 @@ const App = () => {
               )}
 
               {activeTab === 'structure' && <StructureManagerView user={user} />}
+
+              {activeTab === 'catalog-hierarchy' && <CatalogHierarchyView user={user} />}
             </motion.div>
           </AnimatePresence>
         </div>

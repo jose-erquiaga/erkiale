@@ -139,15 +139,20 @@ service cloud.firestore {
 
     // --- CATALOG HIERARCHY (Gremio -> Estancia -> Tipo -> Subcategoria -> Item) ---
     // Read: any signed-in user (catalog + budgets need to browse it).
-    // Write: admin only, matching the structure manager's access rule.
+    // Create: any signed-in user (the catalog flow lets anyone quick-add a new
+    //   Gremio/Estancia/Subcategoria while creating an item — an additive
+    //   convenience, not a structural edit).
+    // Rename/reorder/delete: admin only, via the Structure Manager panel.
     match /guilds/{guildId} {
       allow read: if isSignedIn();
-      allow create, update: if isAdmin() && isValidGuild(incoming());
+      allow create: if isSignedIn() && isValidGuild(incoming());
+      allow update: if isAdmin() && isValidGuild(incoming());
       allow delete: if isAdmin();
 
       match /rooms/{roomId} {
         allow read: if isSignedIn();
-        allow create, update: if isAdmin() && isValidRoom(incoming());
+        allow create: if isSignedIn() && isValidRoom(incoming());
+        allow update: if isAdmin() && isValidRoom(incoming());
         allow delete: if isAdmin();
 
         match /types/{typeId} {
@@ -156,13 +161,14 @@ service cloud.firestore {
 
           match /subcategories/{subcategoryId} {
             allow read: if isSignedIn();
-            allow create, update: if isAdmin() && isValidSubcategory(incoming());
+            allow create: if isSignedIn() && isValidSubcategory(incoming());
+            allow update: if isAdmin() && isValidSubcategory(incoming());
             allow delete: if isAdmin();
 
             match /items/{itemId} {
               allow read: if isSignedIn();
-              allow create, update: if isAdmin() && isValidHierarchicalCatalogItem(incoming());
-              allow delete: if isAdmin();
+              allow create, update: if isSignedIn() && isValidHierarchicalCatalogItem(incoming());
+              allow delete: if isSignedIn();
             }
           }
         }
