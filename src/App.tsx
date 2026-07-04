@@ -47,6 +47,8 @@ import { useAuth } from './hooks/useAuth';
 import { useSettings } from './hooks/useSettings';
 import { useCatalog } from './hooks/useCatalog';
 import { useCalendarEvents } from './hooks/useCalendarEvents';
+import { useProjects } from './hooks/useProjects';
+import { useProjectSubcollections } from './hooks/useProjectSubcollections';
 import { db, auth, isFirebaseConfigured, isAdmin, OperationType, handleFirestoreError } from './lib/firebase';
 import type { Project, CompanyInfo, CatalogItem, CalendarEvent, BudgetItem, ExpenseItem } from './types';
 import { DEFAULT_COMPANY, DEFAULT_EXPENSE_CATEGORIES, PROJECT_COLORS } from './data/constants';
@@ -71,11 +73,19 @@ const App = () => {
 
   const { categories, units, companyInfo, expenseCategories, saveNewCategory: saveNewCategoryFor, saveNewUnit: saveNewUnitFor } = useSettings(user);
 
-  const [projects, setProjects] = useState<Project[]>([]);
+  const { projects, handleAddProject: handleAddProjectFor, handleUpdateProjectStatus } = useProjects(user, selectedProjectId, setSelectedProjectId);
   const { events, saveEvent, handleDragOver, handleDrop } = useCalendarEvents(user);
-  const [budgets, setBudgets] = useState<Record<number | string, BudgetItem[]>>({});
-  const [invoices, setInvoices] = useState<Record<number | string, BudgetItem[]>>({});
-  const [expenses, setExpenses] = useState<Record<number | string, ExpenseItem[]>>({});
+  const {
+    budgets,
+    invoices,
+    expenses,
+    handleAddBudgetItem: handleAddBudgetItemFor,
+    handleUpdateBudgetItem: handleUpdateBudgetItemFor,
+    handleGenerateInvoice: handleGenerateInvoiceFor,
+    handleUpdateInvoiceItem: handleUpdateInvoiceItemFor,
+    handleSaveExpense,
+    handleUpdateExpenseItem: handleUpdateExpenseItemFor,
+  } = useProjectSubcollections(user, selectedProjectId, projects);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [addingEventDate, setAddingEventDate] = useState<string | null>(null);
   const [isAddingBudgetItem, setIsAddingBudgetItem] = useState(false);
@@ -110,184 +120,22 @@ const App = () => {
     handleConfirmScannedCatalog,
   } = useCatalog(user, categories, units);
 
-  // --- PERSISTENCE ---
-  useEffect(() => {
-    if (!user || !isFirebaseConfigured || !db) return;
-
-    const pathProjects = 'projects';
-    // Load Projects
-    const projectsQuery = collection(db, 'projects');
-    const projectsUnsubscribe = onSnapshot(projectsQuery, (snapshot) => {
-      const projectsList = snapshot.docs.map(doc => ({ ...doc.data(), firebaseId: doc.id } as Project));
-      setProjects(projectsList);
-      if (projectsList.length > 0 && (selectedProjectId === '' || !projectsList.map(p => p.firebaseId).includes(selectedProjectId))) {
-        setSelectedProjectId(projectsList[0].firebaseId || '');
-      }
-    }, (error) => handleFirestoreError(error, OperationType.LIST, pathProjects));
-
-    return () => {
-      projectsUnsubscribe();
-    };
-  }, [user]);
-
-  // Load project-specific data when selected project changes
-  useEffect(() => {
-    // CRITICAL: Don't listen for subcollections if no project is selected or if it's the initial "0"
-    if (!user || !selectedProjectId) return;
-
-    const projectIdStr = String(selectedProjectId);
-    
-    // Safety check: ensure project actually exists in projects list
-    const projectExists = projects.some(p => p.firebaseId === selectedProjectId);
-    if (!projectExists) return;
-
-    const pathBudget = `projects/${projectIdStr}/budget_items`;
-    // Budget items
-    const budgetUnsubscribe = onSnapshot(collection(db, 'projects', projectIdStr, 'budget_items'), (snapshot) => {
-      setBudgets(prev => ({
-        ...prev,
-        [selectedProjectId]: snapshot.docs.map(doc => ({ ...doc.data(), firebaseId: doc.id } as BudgetItem))
-      }));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, pathBudget));
-
-    const pathInvoice = `projects/${projectIdStr}/invoice_items`;
-    // Invoice items
-    const invoiceUnsubscribe = onSnapshot(collection(db, 'projects', projectIdStr, 'invoice_items'), (snapshot) => {
-      setInvoices(prev => ({
-        ...prev,
-        [selectedProjectId]: snapshot.docs.map(doc => ({ ...doc.data(), firebaseId: doc.id } as BudgetItem))
-      }));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, pathInvoice));
-
-    const pathExpense = `projects/${projectIdStr}/expense_items`;
-    // Expense items
-    const expenseUnsubscribe = onSnapshot(collection(db, 'projects', projectIdStr, 'expense_items'), (snapshot) => {
-      setExpenses(prev => ({
-        ...prev,
-        [selectedProjectId]: snapshot.docs.map(doc => ({ ...doc.data(), firebaseId: doc.id } as ExpenseItem))
-      }));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, pathExpense));
-
-    return () => {
-      budgetUnsubscribe();
-      invoiceUnsubscribe();
-      expenseUnsubscribe();
-    };
-  }, [user, selectedProjectId, projects]);
-
   // --- HANDLERS ---
   const handleGenerateInvoice = async () => {
-    const budgetItems = budgets[selectedProjectId] || [];
-    if (budgetItems.length === 0) {
-      alert("No hay partidas en el presupuesto activo para facturar.");
-      return;
-    }
-
-    if (invoices[selectedProjectId] && invoices[selectedProjectId].length > 0) {
-      if (!confirm("Ya existe una factura para este proyecto con cambios guardados. ¿Deseas SOBRESCRIBIRLA con los datos del presupuesto actual? Perderás los cambios específicos de facturación.")) {
-        setActiveTab('billing');
-        return;
-      }
-    }
-
     setIsGeneratingInvoice(true);
-    try {
-      const projectIdStr = String(selectedProjectId);
-      const existingInvoices = invoices[selectedProjectId] || [];
-      for (const item of existingInvoices) {
-        if (item.firebaseId) {
-          await deleteDoc(doc(db, 'projects', projectIdStr, 'invoice_items', item.firebaseId));
-        }
-      }
-
-      for (const item of budgetItems) {
-        await addDoc(collection(db, 'projects', projectIdStr, 'invoice_items'), {
-          concept: item.concept,
-          qty: item.qty,
-          unit: item.unit,
-          price: item.price,
-          total: item.total
-        });
-      }
-      setActiveTab('billing');
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `projects/${selectedProjectId}/invoice_items`);
-    } finally {
-      setIsGeneratingInvoice(false);
-    }
+    const success = await handleGenerateInvoiceFor();
+    setIsGeneratingInvoice(false);
+    if (success) setActiveTab('billing');
   };
 
   const handleUpdateInvoiceItem = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!editingInvoiceItem || !editingInvoiceItem.firebaseId) return;
-    const formData = new FormData(e.currentTarget);
-    const concept = formData.get('concept') as string;
-    const qty = parseFloat(formData.get('qty') as string) || 0;
-    const price = parseFloat(formData.get('price') as string) || 0;
-
-    try {
-      await updateDoc(doc(db, 'projects', String(selectedProjectId), 'invoice_items', editingInvoiceItem.firebaseId), {
-        concept,
-        qty,
-        price,
-        total: qty * price
-      });
-      setEditingInvoiceItem(null);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `projects/${selectedProjectId}/invoice_items/${editingInvoiceItem.firebaseId}`);
-    }
+    await handleUpdateInvoiceItemFor(editingInvoiceItem, e);
+    setEditingInvoiceItem(null);
   };
 
   const handleUpdateExpenseItem = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!editingExpenseItem || !editingExpenseItem.firebaseId) return;
-    const formData = new FormData(e.currentTarget);
-    const concept = formData.get('concept') as string;
-    const qty = parseFloat(formData.get('qty') as string) || 0;
-    const price = parseFloat(formData.get('price') as string) || 0;
-    const category = formData.get('category') as string;
-    const date = formData.get('date') as string;
-    const unit = formData.get('unit') as string;
-
-    try {
-      await updateDoc(doc(db, 'projects', String(selectedProjectId), 'expense_items', editingExpenseItem.firebaseId), {
-        concept,
-        qty,
-        price,
-        total: qty * price,
-        category,
-        date,
-        unit
-      });
-      setEditingExpenseItem(null);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `projects/${selectedProjectId}/expense_items/${editingExpenseItem.firebaseId}`);
-    }
-  };
-
-  const handleSaveExpense = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const form = e.currentTarget;
-    const formData = new FormData(form);
-    const qty = parseFloat(formData.get('qty') as string) || 0;
-    const price = parseFloat(formData.get('price') as string) || 0;
-    const data = {
-      concept: formData.get('concept') as string,
-      qty,
-      price,
-      total: qty * price,
-      category: formData.get('category') as string,
-      date: formData.get('date') as string,
-      unit: formData.get('unit') as string,
-      id: Date.now()
-    };
-
-    try {
-      await addDoc(collection(db, 'projects', String(selectedProjectId), 'expense_items'), data);
-      form.reset();
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, `projects/${selectedProjectId}/expense_items`);
-    }
+    await handleUpdateExpenseItemFor(editingExpenseItem, e);
+    setEditingExpenseItem(null);
   };
 
   const handleSaveEvent = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -310,24 +158,8 @@ const App = () => {
   };
 
   const handleAddBudgetItem = async (catalogItemId: string, qty: number) => {
-    const catalogItem = catalog.find(item => item.firebaseId === catalogItemId);
-    if (!catalogItem) return;
-
-    const newItem = {
-      id: Date.now(),
-      concept: catalogItem.concept,
-      qty: qty,
-      unit: catalogItem.unit,
-      price: catalogItem.price,
-      total: qty * catalogItem.price
-    };
-
-    try {
-      await addDoc(collection(db, 'projects', String(selectedProjectId), 'budget_items'), newItem);
-      setIsAddingBudgetItem(false);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, `projects/${selectedProjectId}/budget_items`);
-    }
+    const success = await handleAddBudgetItemFor(catalog, catalogItemId, qty);
+    if (success) setIsAddingBudgetItem(false);
   };
 
   const confirmDelete = async () => {
@@ -367,24 +199,8 @@ const App = () => {
   };
 
   const handleUpdateBudgetItem = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!editingBudgetItem || !editingBudgetItem.firebaseId) return;
-    const formData = new FormData(e.currentTarget);
-    const concept = formData.get('concept') as string;
-    const qty = parseFloat(formData.get('qty') as string) || 0;
-    const price = parseFloat(formData.get('price') as string) || 0;
-
-    try {
-      await updateDoc(doc(db, 'projects', String(selectedProjectId), 'budget_items', editingBudgetItem.firebaseId), {
-        concept,
-        qty,
-        price,
-        total: qty * price
-      });
-      setEditingBudgetItem(null);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `projects/${selectedProjectId}/budget_items/${editingBudgetItem.firebaseId}`);
-    }
+    await handleUpdateBudgetItemFor(editingBudgetItem, e);
+    setEditingBudgetItem(null);
   };
 
   const handleUpdateCatalogItem = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -487,43 +303,9 @@ const App = () => {
     setIsAddingUnit(false);
   };
 
-  const handleUpdateProjectStatus = async (projectId: string | number, status: 'En curso' | 'Pendiente' | 'Finalizado') => {
-    try {
-      const projectDoc = projects.find(p => p.firebaseId === projectId || p.id === projectId);
-      if (projectDoc?.firebaseId) {
-        await updateDoc(doc(db, 'projects', projectDoc.firebaseId), { status });
-      }
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `projects/${projectId}`);
-    }
-  };
-
   const handleAddProject = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!user) return;
-    const formData = new FormData(e.currentTarget);
-    // Pick next color not already used; fall back to cycling if all 8 are taken
-    const usedColors = new Set(projects.map(p => p.color).filter(Boolean));
-    const nextColor = PROJECT_COLORS.find(c => !usedColors.has(c)) || PROJECT_COLORS[projects.length % PROJECT_COLORS.length];
-    const newProject = {
-      id: Date.now(),
-      name: formData.get('name') as string,
-      clientName: formData.get('clientName') as string,
-      clientCIF: formData.get('clientCIF') as string,
-      clientAddress: formData.get('clientAddress') as string,
-      clientEmail: formData.get('clientEmail') as string,
-      clientPhone: formData.get('clientPhone') as string,
-      status: 'Pendiente' as const,
-      category: (formData.get('category') as string) || 'General',
-      color: nextColor,
-      ownerId: user.uid
-    };
-    try {
-      await addDoc(collection(db, 'projects'), newProject);
-      setIsModalOpen(false);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, 'projects');
-    }
+    const success = await handleAddProjectFor(e);
+    if (success) setIsModalOpen(false);
   };
 
   const selectedProject = projects.find(p => p.firebaseId === selectedProjectId) || projects[0] || null;

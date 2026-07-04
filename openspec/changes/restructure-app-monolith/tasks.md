@@ -43,13 +43,14 @@
 
 ## 4. Projects and per-project subcollection hooks
 
-- [ ] 4.1 Create `src/hooks/useProjects.ts`: move the `projects` collection listener,
-      `selectedProjectId` sync logic, and project add/update/delete handlers
-- [ ] 4.2 Wire `useProjects` into `App.tsx`; verify creating, selecting, and deleting projects
-- [ ] 4.3 Create `src/hooks/useProjectSubcollections.ts`: move the budget/invoice/expense items
-      listeners (per selected project) and their add/update/delete handlers, plus
-      `handleGenerateInvoice`
-- [ ] 4.4 Wire `useProjectSubcollections` into `App.tsx`; verify budget items, invoice generation
+- [x] 4.1 Create `src/hooks/useProjects.ts`: move the `projects` collection listener,
+      `selectedProjectId` sync logic, and project add/update handlers (project delete stays in
+      the shared `confirmDelete`, same as other domains)
+- [x] 4.2 Wire `useProjects` into `App.tsx`; verify creating, selecting, and deleting projects
+- [x] 4.3 Create `src/hooks/useProjectSubcollections.ts`: move the budget/invoice/expense items
+      listeners (per selected project) and their add/update handlers, plus
+      `handleGenerateInvoice` (delete stays in the shared `confirmDelete`)
+- [x] 4.4 Wire `useProjectSubcollections` into `App.tsx`; verify budget items, invoice generation
       and editing, and expense tracking
 
 ## 5. View components
