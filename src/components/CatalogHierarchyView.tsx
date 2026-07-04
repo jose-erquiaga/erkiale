@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, X, Hammer } from 'lucide-react';
+import { Plus, X, Hammer, ChevronDown, Check } from 'lucide-react';
 import { useCatalogHierarchy } from '../hooks/useCatalogHierarchy';
 import type { CatalogType, CatalogItemMode } from '../types/catalogHierarchy';
 
@@ -7,6 +7,16 @@ const TYPE_LABELS: Record<CatalogType, string> = {
   tareas: 'Tareas a realizar',
   material: 'Material',
 };
+
+// Native <select> styled with appearance-none needs an explicit chevron —
+// otherwise it's visually indistinguishable from a plain text input.
+function SelectChevron() {
+  return (
+    <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+      <ChevronDown size={14} />
+    </div>
+  );
+}
 
 export const CatalogHierarchyView = ({ user }: { user: unknown }) => {
   const hierarchy = useCatalogHierarchy(user);
@@ -22,6 +32,8 @@ export const CatalogHierarchyView = ({ user }: { user: unknown }) => {
   const [newRoomName, setNewRoomName] = useState('');
   const [addingSubcategory, setAddingSubcategory] = useState(false);
   const [newSubcategoryName, setNewSubcategoryName] = useState('');
+
+  const [renaming, setRenaming] = useState<{ kind: 'guild' | 'room' | 'subcategory'; val: string } | null>(null);
 
   const [mode, setMode] = useState<CatalogItemMode>('texto_libre');
 
@@ -48,6 +60,19 @@ export const CatalogHierarchyView = ({ user }: { user: unknown }) => {
     if (subcategoryId && !subcatsForType.some(s => s.firebaseId === subcategoryId)) setSubcategoryId('');
     if (!subcategoryId && subcatsForType.length > 0) setSubcategoryId(subcatsForType[0].firebaseId);
   }, [subcatsForType, subcategoryId]);
+
+  const currentGuildName = sortedGuilds.find(g => g.firebaseId === guildId)?.name || '';
+  const currentRoomName = roomsForGuild.find(r => r.firebaseId === roomId)?.name || '';
+  const currentSubcategoryName = subcatsForType.find(s => s.firebaseId === subcategoryId)?.name || '';
+
+  const saveRename = async () => {
+    if (!renaming || !renaming.val.trim()) { setRenaming(null); return; }
+    const val = renaming.val.trim();
+    if (renaming.kind === 'guild' && guildId) await hierarchy.renameGuild(guildId, val);
+    if (renaming.kind === 'room' && guildId && roomId) await hierarchy.renameRoom(guildId, roomId, val);
+    if (renaming.kind === 'subcategory' && guildId && roomId && subcategoryId) await hierarchy.renameSubcategory(guildId, roomId, type, subcategoryId, val);
+    setRenaming(null);
+  };
 
   const handleAddItem = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -93,15 +118,28 @@ export const CatalogHierarchyView = ({ user }: { user: unknown }) => {
               <div className="flex gap-1">
                 <input autoFocus value={newGuildName} onChange={e => setNewGuildName(e.target.value)}
                   onKeyDown={async e => { if (e.key === 'Enter' && newGuildName.trim()) { await hierarchy.addGuild(newGuildName.trim()); setNewGuildName(''); setAddingGuild(false); } if (e.key === 'Escape') setAddingGuild(false); }}
-                  className="flex-1 p-3 bg-slate-50 border border-blue-300 rounded-xl text-sm font-bold outline-none" placeholder="Nombre..." />
-                <button onClick={async () => { if (newGuildName.trim()) { await hierarchy.addGuild(newGuildName.trim()); setNewGuildName(''); } setAddingGuild(false); }} className="px-2 bg-emerald-500 text-white rounded-xl"><Plus size={14}/></button>
+                  className="flex-1 p-3 bg-slate-50 border border-blue-300 rounded-xl text-sm font-bold outline-none" placeholder="Nombre del nuevo gremio..." />
+                <button onClick={async () => { if (newGuildName.trim()) { await hierarchy.addGuild(newGuildName.trim()); setNewGuildName(''); } setAddingGuild(false); }} className="px-2 bg-emerald-500 text-white rounded-xl" title="Guardar"><Check size={14}/></button>
+                <button onClick={() => setAddingGuild(false)} className="px-2 bg-slate-100 text-slate-500 rounded-xl" title="Cancelar"><X size={14}/></button>
+              </div>
+            ) : renaming?.kind === 'guild' ? (
+              <div className="flex gap-1">
+                <input autoFocus value={renaming.val} onChange={e => setRenaming({ kind: 'guild', val: e.target.value })}
+                  onKeyDown={e => { if (e.key === 'Enter') saveRename(); if (e.key === 'Escape') setRenaming(null); }}
+                  className="flex-1 p-3 bg-slate-50 border border-blue-300 rounded-xl text-sm font-bold outline-none" />
+                <button onClick={saveRename} className="px-2 bg-emerald-500 text-white rounded-xl" title="Guardar"><Check size={14}/></button>
+                <button onClick={() => setRenaming(null)} className="px-2 bg-slate-100 text-slate-500 rounded-xl" title="Cancelar"><X size={14}/></button>
               </div>
             ) : (
               <div className="flex gap-1">
-                <select value={guildId} onChange={e => setGuildId(e.target.value)} className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-4 focus:ring-blue-100 appearance-none">
-                  {sortedGuilds.map(g => <option key={g.firebaseId} value={g.firebaseId}>{g.name}</option>)}
-                </select>
-                <button onClick={() => setAddingGuild(true)} className="px-2 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200"><Plus size={14}/></button>
+                <div className="relative flex-1">
+                  <select value={guildId} onChange={e => setGuildId(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-4 focus:ring-blue-100 appearance-none cursor-pointer">
+                    {sortedGuilds.length === 0 ? <option>Sin gremios</option> : sortedGuilds.map(g => <option key={g.firebaseId} value={g.firebaseId}>{g.name}</option>)}
+                  </select>
+                  <SelectChevron />
+                </div>
+                <button onClick={() => guildId && setRenaming({ kind: 'guild', val: currentGuildName })} disabled={!guildId} className="px-2 bg-slate-100 text-blue-500 rounded-xl hover:bg-blue-50 disabled:opacity-50" title="Renombrar gremio"><Hammer size={14}/></button>
+                <button onClick={() => setAddingGuild(true)} className="px-2 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200" title="Nuevo gremio"><Plus size={14}/></button>
               </div>
             )}
           </div>
@@ -112,25 +150,41 @@ export const CatalogHierarchyView = ({ user }: { user: unknown }) => {
               <div className="flex gap-1">
                 <input autoFocus value={newRoomName} onChange={e => setNewRoomName(e.target.value)}
                   onKeyDown={async e => { if (e.key === 'Enter' && newRoomName.trim() && guildId) { await hierarchy.addRoom(guildId, newRoomName.trim()); setNewRoomName(''); setAddingRoom(false); } if (e.key === 'Escape') setAddingRoom(false); }}
-                  className="flex-1 p-3 bg-slate-50 border border-blue-300 rounded-xl text-sm font-bold outline-none" placeholder="Nombre..." disabled={!guildId} />
-                <button onClick={async () => { if (newRoomName.trim() && guildId) { await hierarchy.addRoom(guildId, newRoomName.trim()); setNewRoomName(''); } setAddingRoom(false); }} className="px-2 bg-emerald-500 text-white rounded-xl"><Plus size={14}/></button>
+                  className="flex-1 p-3 bg-slate-50 border border-blue-300 rounded-xl text-sm font-bold outline-none" placeholder="Nombre de la nueva estancia..." disabled={!guildId} />
+                <button onClick={async () => { if (newRoomName.trim() && guildId) { await hierarchy.addRoom(guildId, newRoomName.trim()); setNewRoomName(''); } setAddingRoom(false); }} className="px-2 bg-emerald-500 text-white rounded-xl" title="Guardar"><Check size={14}/></button>
+                <button onClick={() => setAddingRoom(false)} className="px-2 bg-slate-100 text-slate-500 rounded-xl" title="Cancelar"><X size={14}/></button>
+              </div>
+            ) : renaming?.kind === 'room' ? (
+              <div className="flex gap-1">
+                <input autoFocus value={renaming.val} onChange={e => setRenaming({ kind: 'room', val: e.target.value })}
+                  onKeyDown={e => { if (e.key === 'Enter') saveRename(); if (e.key === 'Escape') setRenaming(null); }}
+                  className="flex-1 p-3 bg-slate-50 border border-blue-300 rounded-xl text-sm font-bold outline-none" />
+                <button onClick={saveRename} className="px-2 bg-emerald-500 text-white rounded-xl" title="Guardar"><Check size={14}/></button>
+                <button onClick={() => setRenaming(null)} className="px-2 bg-slate-100 text-slate-500 rounded-xl" title="Cancelar"><X size={14}/></button>
               </div>
             ) : (
               <div className="flex gap-1">
-                <select value={roomId} onChange={e => setRoomId(e.target.value)} disabled={!guildId} className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-4 focus:ring-blue-100 appearance-none disabled:opacity-50">
-                  {roomsForGuild.length === 0 ? <option>Sin estancias</option> : roomsForGuild.map(r => <option key={r.firebaseId} value={r.firebaseId}>{r.name}</option>)}
-                </select>
-                <button onClick={() => setAddingRoom(true)} disabled={!guildId} className="px-2 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200 disabled:opacity-50"><Plus size={14}/></button>
+                <div className="relative flex-1">
+                  <select value={roomId} onChange={e => setRoomId(e.target.value)} disabled={!guildId} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-4 focus:ring-blue-100 appearance-none disabled:opacity-50 cursor-pointer">
+                    {roomsForGuild.length === 0 ? <option>Sin estancias</option> : roomsForGuild.map(r => <option key={r.firebaseId} value={r.firebaseId}>{r.name}</option>)}
+                  </select>
+                  <SelectChevron />
+                </div>
+                <button onClick={() => roomId && setRenaming({ kind: 'room', val: currentRoomName })} disabled={!roomId} className="px-2 bg-slate-100 text-blue-500 rounded-xl hover:bg-blue-50 disabled:opacity-50" title="Renombrar estancia"><Hammer size={14}/></button>
+                <button onClick={() => setAddingRoom(true)} disabled={!guildId} className="px-2 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200 disabled:opacity-50" title="Nueva estancia"><Plus size={14}/></button>
               </div>
             )}
           </div>
 
           <div className="space-y-2">
             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Tipo</label>
-            <select value={type} onChange={e => setType(e.target.value as CatalogType)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-4 focus:ring-blue-100 appearance-none">
-              <option value="tareas">Tareas a realizar</option>
-              <option value="material">Material</option>
-            </select>
+            <div className="relative">
+              <select value={type} onChange={e => setType(e.target.value as CatalogType)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-4 focus:ring-blue-100 appearance-none cursor-pointer">
+                <option value="tareas">Tareas a realizar</option>
+                <option value="material">Material</option>
+              </select>
+              <SelectChevron />
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -139,15 +193,28 @@ export const CatalogHierarchyView = ({ user }: { user: unknown }) => {
               <div className="flex gap-1">
                 <input autoFocus value={newSubcategoryName} onChange={e => setNewSubcategoryName(e.target.value)}
                   onKeyDown={async e => { if (e.key === 'Enter' && newSubcategoryName.trim() && guildId && roomId) { await hierarchy.addSubcategory(guildId, roomId, type, newSubcategoryName.trim()); setNewSubcategoryName(''); setAddingSubcategory(false); } if (e.key === 'Escape') setAddingSubcategory(false); }}
-                  className="flex-1 p-3 bg-slate-50 border border-blue-300 rounded-xl text-sm font-bold outline-none" placeholder="Nombre..." disabled={!roomId} />
-                <button onClick={async () => { if (newSubcategoryName.trim() && guildId && roomId) { await hierarchy.addSubcategory(guildId, roomId, type, newSubcategoryName.trim()); setNewSubcategoryName(''); } setAddingSubcategory(false); }} className="px-2 bg-emerald-500 text-white rounded-xl"><Plus size={14}/></button>
+                  className="flex-1 p-3 bg-slate-50 border border-blue-300 rounded-xl text-sm font-bold outline-none" placeholder="Nombre de la nueva subcategoría..." disabled={!roomId} />
+                <button onClick={async () => { if (newSubcategoryName.trim() && guildId && roomId) { await hierarchy.addSubcategory(guildId, roomId, type, newSubcategoryName.trim()); setNewSubcategoryName(''); } setAddingSubcategory(false); }} className="px-2 bg-emerald-500 text-white rounded-xl" title="Guardar"><Check size={14}/></button>
+                <button onClick={() => setAddingSubcategory(false)} className="px-2 bg-slate-100 text-slate-500 rounded-xl" title="Cancelar"><X size={14}/></button>
+              </div>
+            ) : renaming?.kind === 'subcategory' ? (
+              <div className="flex gap-1">
+                <input autoFocus value={renaming.val} onChange={e => setRenaming({ kind: 'subcategory', val: e.target.value })}
+                  onKeyDown={e => { if (e.key === 'Enter') saveRename(); if (e.key === 'Escape') setRenaming(null); }}
+                  className="flex-1 p-3 bg-slate-50 border border-blue-300 rounded-xl text-sm font-bold outline-none" />
+                <button onClick={saveRename} className="px-2 bg-emerald-500 text-white rounded-xl" title="Guardar"><Check size={14}/></button>
+                <button onClick={() => setRenaming(null)} className="px-2 bg-slate-100 text-slate-500 rounded-xl" title="Cancelar"><X size={14}/></button>
               </div>
             ) : (
               <div className="flex gap-1">
-                <select value={subcategoryId} onChange={e => setSubcategoryId(e.target.value)} disabled={!roomId} className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-4 focus:ring-blue-100 appearance-none disabled:opacity-50">
-                  {subcatsForType.length === 0 ? <option>Sin subcategorías</option> : subcatsForType.map(s => <option key={s.firebaseId} value={s.firebaseId}>{s.name}</option>)}
-                </select>
-                <button onClick={() => setAddingSubcategory(true)} disabled={!roomId} className="px-2 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200 disabled:opacity-50"><Plus size={14}/></button>
+                <div className="relative flex-1">
+                  <select value={subcategoryId} onChange={e => setSubcategoryId(e.target.value)} disabled={!roomId} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-4 focus:ring-blue-100 appearance-none disabled:opacity-50 cursor-pointer">
+                    {subcatsForType.length === 0 ? <option>Sin subcategorías</option> : subcatsForType.map(s => <option key={s.firebaseId} value={s.firebaseId}>{s.name}</option>)}
+                  </select>
+                  <SelectChevron />
+                </div>
+                <button onClick={() => subcategoryId && setRenaming({ kind: 'subcategory', val: currentSubcategoryName })} disabled={!subcategoryId} className="px-2 bg-slate-100 text-blue-500 rounded-xl hover:bg-blue-50 disabled:opacity-50" title="Renombrar subcategoría"><Hammer size={14}/></button>
+                <button onClick={() => setAddingSubcategory(true)} disabled={!roomId} className="px-2 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200 disabled:opacity-50" title="Nueva subcategoría"><Plus size={14}/></button>
               </div>
             )}
           </div>

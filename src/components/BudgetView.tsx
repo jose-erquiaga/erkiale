@@ -1,9 +1,19 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Plus, X, DollarSign, Receipt, AlertCircle, FileText, Hammer } from 'lucide-react';
+import { Plus, X, DollarSign, Receipt, AlertCircle, FileText, Hammer, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import type { Project, BudgetItem, ExpenseItem } from '../types';
 import type { CatalogType } from '../types/catalogHierarchy';
 import { useCatalogHierarchy } from '../hooks/useCatalogHierarchy';
+
+// Native <select> styled with appearance-none needs an explicit chevron —
+// otherwise it's visually indistinguishable from a plain text input.
+function SelectChevron() {
+  return (
+    <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+      <ChevronDown size={14} />
+    </div>
+  );
+}
 
 interface BudgetViewProps {
   project: Project;
@@ -279,36 +289,51 @@ export const BudgetView = ({
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                      <div className="md:col-span-2 space-y-2">
                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Gremio</label>
-                       <select value={guildId} onChange={e => setGuildId(e.target.value)} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm appearance-none">
-                         {sortedGuilds.map(g => <option key={g.firebaseId} value={g.firebaseId}>{g.name}</option>)}
-                       </select>
+                       <div className="relative">
+                         <select value={guildId} onChange={e => setGuildId(e.target.value)} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm appearance-none cursor-pointer">
+                           {sortedGuilds.map(g => <option key={g.firebaseId} value={g.firebaseId}>{g.name}</option>)}
+                         </select>
+                         <SelectChevron />
+                       </div>
                      </div>
                      <div className="md:col-span-2 space-y-2">
                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Estancia</label>
-                       <select value={roomId} onChange={e => setRoomId(e.target.value)} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm appearance-none">
-                         {roomsForGuild.map(r => <option key={r.firebaseId} value={r.firebaseId}>{r.name}</option>)}
-                       </select>
+                       <div className="relative">
+                         <select value={roomId} onChange={e => setRoomId(e.target.value)} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm appearance-none cursor-pointer">
+                           {roomsForGuild.map(r => <option key={r.firebaseId} value={r.firebaseId}>{r.name}</option>)}
+                         </select>
+                         <SelectChevron />
+                       </div>
                      </div>
                      <div className="md:col-span-2 space-y-2">
                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Tipo</label>
-                       <select value={type} onChange={e => setType(e.target.value as CatalogType)} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm appearance-none">
-                         <option value="tareas">Tareas</option>
-                         <option value="material">Material</option>
-                       </select>
+                       <div className="relative">
+                         <select value={type} onChange={e => setType(e.target.value as CatalogType)} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm appearance-none cursor-pointer">
+                           <option value="tareas">Tareas</option>
+                           <option value="material">Material</option>
+                         </select>
+                         <SelectChevron />
+                       </div>
                      </div>
                      <div className="md:col-span-2 space-y-2">
                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Subcategoría</label>
-                       <select value={subcategoryId} onChange={e => setSubcategoryId(e.target.value)} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm appearance-none">
-                         {subcatsForType.map(s => <option key={s.firebaseId} value={s.firebaseId}>{s.name}</option>)}
-                       </select>
+                       <div className="relative">
+                         <select value={subcategoryId} onChange={e => setSubcategoryId(e.target.value)} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm appearance-none cursor-pointer">
+                           {subcatsForType.map(s => <option key={s.firebaseId} value={s.firebaseId}>{s.name}</option>)}
+                         </select>
+                         <SelectChevron />
+                       </div>
                      </div>
                      <div className="md:col-span-2 space-y-2">
                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Ítem</label>
-                       <select value={selectedCatalogItemId} onChange={e => setSelectedCatalogItemId(e.target.value)} disabled={itemsForSubcategory.length === 0} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm appearance-none disabled:bg-slate-50">
-                          {itemsForSubcategory.length > 0 ? itemsForSubcategory.map(item => (
-                              <option key={item.firebaseId} value={item.firebaseId}>{item.mode === 'texto_libre' ? item.description : `${item.totalM2}m²`} ({item.price}€/{item.unit})</option>
-                          )) : <option>Sin ítems</option>}
-                       </select>
+                       <div className="relative">
+                         <select value={selectedCatalogItemId} onChange={e => setSelectedCatalogItemId(e.target.value)} disabled={itemsForSubcategory.length === 0} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm appearance-none disabled:bg-slate-50 cursor-pointer">
+                            {itemsForSubcategory.length > 0 ? itemsForSubcategory.map(item => (
+                                <option key={item.firebaseId} value={item.firebaseId}>{item.mode === 'texto_libre' ? item.description : `${item.totalM2}m²`} ({item.price}€/{item.unit})</option>
+                            )) : <option>Sin ítems</option>}
+                         </select>
+                         <SelectChevron />
+                       </div>
                      </div>
                      <div className="md:col-span-1 space-y-2">
                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Cant.</label>
@@ -328,10 +353,13 @@ export const BudgetView = ({
                     </div>
                     <div className="md:col-span-2 space-y-2">
                       <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Tipo</label>
-                      <select name="tipo" className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm appearance-none">
-                        <option value="tareas">Tareas</option>
-                        <option value="material">Material</option>
-                      </select>
+                      <div className="relative">
+                        <select name="tipo" className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm appearance-none cursor-pointer">
+                          <option value="tareas">Tareas</option>
+                          <option value="material">Material</option>
+                        </select>
+                        <SelectChevron />
+                      </div>
                     </div>
                     <div className="md:col-span-2 space-y-2">
                       <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Unidad</label>
