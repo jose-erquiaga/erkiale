@@ -72,8 +72,9 @@ export const CalendarWidget = ({
                 key={ev.id}
                 draggable
                 onDragStart={(e) => {
-                  e.dataTransfer.setData('text/plain', ev.id.toString());
-                  e.dataTransfer.effectAllowed = 'move';
+                  const dragEvent = e as unknown as React.DragEvent<HTMLDivElement>;
+                  dragEvent.dataTransfer.setData('text/plain', ev.id.toString());
+                  dragEvent.dataTransfer.effectAllowed = 'move';
                 }}
                 onClick={(e) => {
                   e.stopPropagation();

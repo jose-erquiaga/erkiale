@@ -220,6 +220,108 @@ export function useCatalogHierarchy(user: unknown) {
     }
   };
 
+  // --- Move/copy (drag & drop in the structure manager) ---
+  const relocateRoom = async (guildId: string, roomId: string, targetGuildId: string, deleteOrigin: boolean) => {
+    try {
+      const room = rooms.find(r => r.guildId === guildId && r.firebaseId === roomId);
+      if (!room) return false;
+      const subcatsToMove = subcategories.filter(s => s.guildId === guildId && s.roomId === roomId);
+      const itemsToMove = items.filter(i => i.guildId === guildId && i.roomId === roomId);
+
+      const batch = writeBatch(db);
+      const newRoomRef = doc(collection(db, 'guilds', targetGuildId, 'rooms'));
+      batch.set(newRoomRef, { name: room.name, order: rooms.filter(r => r.guildId === targetGuildId).length });
+
+      subcatsToMove.forEach(s => {
+        const newSubRef = subcategoryDoc(targetGuildId, newRoomRef.id, s.type, s.firebaseId);
+        batch.set(newSubRef, { name: s.name, order: s.order });
+      });
+      itemsToMove.forEach(i => {
+        const { firebaseId, guildId: _g, roomId: _r, type: _t, subcategoryId: _s, ...data } = i;
+        const newItemRef = doc(itemsCollection(targetGuildId, newRoomRef.id, i.type, i.subcategoryId), firebaseId);
+        batch.set(newItemRef, data);
+      });
+
+      if (deleteOrigin) {
+        itemsToMove.forEach(i => batch.delete(doc(itemsCollection(guildId, roomId, i.type, i.subcategoryId), i.firebaseId)));
+        subcatsToMove.forEach(s => batch.delete(subcategoryDoc(guildId, roomId, s.type, s.firebaseId)));
+        batch.delete(doc(db, 'guilds', guildId, 'rooms', roomId));
+      }
+
+      await batch.commit();
+      return true;
+    } catch (error) {
+      handleFirestoreError(error, deleteOrigin ? OperationType.UPDATE : OperationType.CREATE, `guilds/${guildId}/rooms/${roomId}`);
+      return false;
+    }
+  };
+  const moveRoom = (guildId: string, roomId: string, targetGuildId: string) => relocateRoom(guildId, roomId, targetGuildId, true);
+  const copyRoom = (guildId: string, roomId: string, targetGuildId: string) => relocateRoom(guildId, roomId, targetGuildId, false);
+
+  const relocateSubcategory = async (
+    guildId: string, roomId: string, type: CatalogType, subcategoryId: string,
+    targetGuildId: string, targetRoomId: string, deleteOrigin: boolean
+  ) => {
+    try {
+      const subcategory = subcategories.find(s => s.guildId === guildId && s.roomId === roomId && s.type === type && s.firebaseId === subcategoryId);
+      if (!subcategory) return false;
+      const itemsToMove = items.filter(i => i.guildId === guildId && i.roomId === roomId && i.type === type && i.subcategoryId === subcategoryId);
+
+      const batch = writeBatch(db);
+      const targetOrder = subcategories.filter(s => s.guildId === targetGuildId && s.roomId === targetRoomId && s.type === type).length;
+      batch.set(subcategoryDoc(targetGuildId, targetRoomId, type, subcategoryId), { name: subcategory.name, order: targetOrder });
+      itemsToMove.forEach(i => {
+        const { firebaseId, guildId: _g, roomId: _r, type: _t, subcategoryId: _s, ...data } = i;
+        batch.set(doc(itemsCollection(targetGuildId, targetRoomId, type, subcategoryId), firebaseId), data);
+      });
+
+      if (deleteOrigin) {
+        itemsToMove.forEach(i => batch.delete(doc(itemsCollection(guildId, roomId, type, subcategoryId), i.firebaseId)));
+        batch.delete(subcategoryDoc(guildId, roomId, type, subcategoryId));
+      }
+
+      await batch.commit();
+      return true;
+    } catch (error) {
+      handleFirestoreError(error, deleteOrigin ? OperationType.UPDATE : OperationType.CREATE, `.../subcategories/${subcategoryId}`);
+      return false;
+    }
+  };
+  const moveSubcategory = (guildId: string, roomId: string, type: CatalogType, subcategoryId: string, targetGuildId: string, targetRoomId: string) =>
+    relocateSubcategory(guildId, roomId, type, subcategoryId, targetGuildId, targetRoomId, true);
+  const copySubcategory = (guildId: string, roomId: string, type: CatalogType, subcategoryId: string, targetGuildId: string, targetRoomId: string) =>
+    relocateSubcategory(guildId, roomId, type, subcategoryId, targetGuildId, targetRoomId, false);
+
+  const relocateItem = async (
+    guildId: string, roomId: string, type: CatalogType, subcategoryId: string, itemId: string,
+    targetGuildId: string, targetRoomId: string, targetType: CatalogType, targetSubcategoryId: string, deleteOrigin: boolean
+  ) => {
+    try {
+      const item = items.find(i => i.guildId === guildId && i.roomId === roomId && i.type === type && i.subcategoryId === subcategoryId && i.firebaseId === itemId);
+      if (!item) return false;
+      const { firebaseId, guildId: _g, roomId: _r, type: _t, subcategoryId: _s, ...data } = item;
+
+      const batch = writeBatch(db);
+      batch.set(doc(itemsCollection(targetGuildId, targetRoomId, targetType, targetSubcategoryId), firebaseId), data);
+      if (deleteOrigin) {
+        batch.delete(doc(itemsCollection(guildId, roomId, type, subcategoryId), itemId));
+      }
+      await batch.commit();
+      return true;
+    } catch (error) {
+      handleFirestoreError(error, deleteOrigin ? OperationType.UPDATE : OperationType.CREATE, `.../items/${itemId}`);
+      return false;
+    }
+  };
+  const moveItem = (
+    guildId: string, roomId: string, type: CatalogType, subcategoryId: string, itemId: string,
+    targetGuildId: string, targetRoomId: string, targetType: CatalogType, targetSubcategoryId: string
+  ) => relocateItem(guildId, roomId, type, subcategoryId, itemId, targetGuildId, targetRoomId, targetType, targetSubcategoryId, true);
+  const copyItem = (
+    guildId: string, roomId: string, type: CatalogType, subcategoryId: string, itemId: string,
+    targetGuildId: string, targetRoomId: string, targetType: CatalogType, targetSubcategoryId: string
+  ) => relocateItem(guildId, roomId, type, subcategoryId, itemId, targetGuildId, targetRoomId, targetType, targetSubcategoryId, false);
+
   const deleteGuildCascade = async (guildId: string) => {
     try {
       const roomsToDelete = rooms.filter(r => r.guildId === guildId);
@@ -249,13 +351,19 @@ export function useCatalogHierarchy(user: unknown) {
     renameRoom,
     reorderRoom,
     deleteRoomCascade,
+    moveRoom,
+    copyRoom,
     addSubcategory,
     renameSubcategory,
     reorderSubcategory,
     deleteSubcategoryCascade,
+    moveSubcategory,
+    copySubcategory,
     addItem,
     updateItem,
     deleteItem,
+    moveItem,
+    copyItem,
     countItemsUnderSubcategory,
     countItemsUnderRoom,
     countItemsUnderGuild,
