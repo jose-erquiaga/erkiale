@@ -69,6 +69,15 @@ service cloud.firestore {
              data.price is number && data.price >= 0;
     }
 
+    function isValidClient(data) {
+      return data.keys().hasAll(['name', 'cif', 'address', 'email', 'phone']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
+             data.cif is string &&
+             data.address is string &&
+             data.email is string &&
+             data.phone is string;
+    }
+
     function isValidCalendarEvent(data) {
       return data.keys().hasAll(['projectId', 'type', 'task', 'startDate']) &&
              data.projectId is string &&
@@ -109,6 +118,12 @@ service cloud.firestore {
         allow create, update: if isSignedIn() && isValidExpenseItem(incoming());
         allow delete: if isSignedIn();
       }
+    }
+
+    match /clients/{clientId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidClient(incoming());
+      allow delete: if isSignedIn();
     }
 
     match /company_expenses/{itemId} {

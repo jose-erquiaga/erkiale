@@ -2,6 +2,9 @@ export interface Project {
   id: number;
   firebaseId?: string;
   name: string;
+  /** Client this project is assigned to. Absent for legacy projects created before the Clients collection existed. */
+  clientId?: string;
+  // Denormalized from Client at assignment time so historical projects survive edits/deletion of the client record.
   clientName: string;
   clientCIF: string;
   clientAddress: string;
@@ -10,6 +13,17 @@ export interface Project {
   status: 'En curso' | 'Pendiente' | 'Finalizado';
   category: string;
   color?: string;
+  ownerId?: string;
+}
+
+export interface Client {
+  id: number;
+  firebaseId?: string;
+  name: string;
+  cif: string;
+  address: string;
+  email: string;
+  phone: string;
   ownerId?: string;
 }
 

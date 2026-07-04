@@ -1,14 +1,19 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import type { Client } from '../../types';
 
 interface NewProjectModalProps {
   isModalOpen: boolean;
   setIsModalOpen: (value: boolean) => void;
+  clients: Client[];
   handleAddProject: (e: React.FormEvent<HTMLFormElement>) => void;
 }
 
-export const NewProjectModal = ({ isModalOpen, setIsModalOpen, handleAddProject }: NewProjectModalProps) => (
+export const NewProjectModal = ({ isModalOpen, setIsModalOpen, clients, handleAddProject }: NewProjectModalProps) => {
+  const [clientMode, setClientMode] = useState<'existing' | 'new'>(clients.length > 0 ? 'existing' : 'new');
+
+  return (
   <AnimatePresence>
     {isModalOpen && (
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
@@ -43,32 +48,60 @@ export const NewProjectModal = ({ isModalOpen, setIsModalOpen, handleAddProject 
               <input name="name" required type="text" placeholder="Ej: Reforma Planta 3 Calle Serrano" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-[1.25rem] font-bold text-slate-900 outline-none focus:ring-4 focus:ring-blue-100 transition-all text-sm" />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Nombre Cliente / Empresa</label>
-                <input name="clientName" required type="text" placeholder="Ej: Juan Pérez" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-[1.25rem] font-bold text-slate-900 outline-none focus:ring-4 focus:ring-blue-100 transition-all text-sm" />
+            <div className="space-y-3">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Cliente</label>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setClientMode('existing')} disabled={clients.length === 0}
+                  className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed ${clientMode === 'existing' ? 'bg-blue-600 text-white' : 'bg-slate-50 text-slate-500'}`}>
+                  Cliente existente
+                </button>
+                <button type="button" onClick={() => setClientMode('new')}
+                  className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${clientMode === 'new' ? 'bg-blue-600 text-white' : 'bg-slate-50 text-slate-500'}`}>
+                  Cliente nuevo
+                </button>
               </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">CIF / NIF</label>
-                <input name="clientCIF" required type="text" placeholder="Ej: 12345678Z" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-[1.25rem] font-bold text-slate-900 outline-none focus:ring-4 focus:ring-blue-100 transition-all text-sm" />
-              </div>
+              <input type="hidden" name="clientMode" value={clientMode} />
             </div>
 
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Dirección Fiscal / Obra</label>
-              <input name="clientAddress" required type="text" placeholder="Calle, Número, CP, Ciudad" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-[1.25rem] font-bold text-slate-900 outline-none focus:ring-4 focus:ring-blue-100 transition-all text-sm" />
-            </div>
+            {clientMode === 'existing' ? (
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Seleccionar Cliente</label>
+                <select name="clientId" required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-[1.25rem] font-bold text-slate-900 outline-none focus:ring-4 focus:ring-blue-100 transition-all text-sm">
+                  {clients.map(c => (
+                    <option key={c.firebaseId} value={c.firebaseId}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Nombre Cliente / Empresa</label>
+                    <input name="clientName" required type="text" placeholder="Ej: Juan Pérez" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-[1.25rem] font-bold text-slate-900 outline-none focus:ring-4 focus:ring-blue-100 transition-all text-sm" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">CIF / NIF</label>
+                    <input name="clientCIF" required type="text" placeholder="Ej: 12345678Z" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-[1.25rem] font-bold text-slate-900 outline-none focus:ring-4 focus:ring-blue-100 transition-all text-sm" />
+                  </div>
+                </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Email de Contacto</label>
-                <input name="clientEmail" required type="email" placeholder="cliente@ejemplo.com" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-[1.25rem] font-bold text-slate-900 outline-none focus:ring-4 focus:ring-blue-100 transition-all text-sm" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Teléfono</label>
-                <input name="clientPhone" required type="tel" placeholder="Ej: 600000000" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-[1.25rem] font-bold text-slate-900 outline-none focus:ring-4 focus:ring-blue-100 transition-all text-sm" />
-              </div>
-            </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Dirección Fiscal / Obra</label>
+                  <input name="clientAddress" required type="text" placeholder="Calle, Número, CP, Ciudad" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-[1.25rem] font-bold text-slate-900 outline-none focus:ring-4 focus:ring-blue-100 transition-all text-sm" />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Email de Contacto</label>
+                    <input name="clientEmail" required type="email" placeholder="cliente@ejemplo.com" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-[1.25rem] font-bold text-slate-900 outline-none focus:ring-4 focus:ring-blue-100 transition-all text-sm" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Teléfono</label>
+                    <input name="clientPhone" required type="tel" placeholder="Ej: 600000000" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-[1.25rem] font-bold text-slate-900 outline-none focus:ring-4 focus:ring-blue-100 transition-all text-sm" />
+                  </div>
+                </div>
+              </>
+            )}
 
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Categoría Obra</label>
@@ -89,4 +122,5 @@ export const NewProjectModal = ({ isModalOpen, setIsModalOpen, handleAddProject 
       </div>
     )}
   </AnimatePresence>
-);
+  );
+};
