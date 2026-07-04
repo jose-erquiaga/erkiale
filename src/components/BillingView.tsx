@@ -158,7 +158,12 @@ function InvoiceItemsTable({ title, items, setEditingInvoiceItem, setDeleteConfi
           {g.rooms.map(r => (
             <div key={r.roomName}>
               <p className="px-6 pl-10 pt-1 pb-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest">{r.roomName}</p>
-              <InvoiceItemRows items={r.items} setEditingInvoiceItem={setEditingInvoiceItem} setDeleteConfirmation={setDeleteConfirmation} />
+              {r.subcategories.map(s => (
+                <div key={s.subcategoryName}>
+                  <p className="px-6 pl-14 pb-1 text-[8px] font-bold text-slate-300 uppercase tracking-widest">{s.subcategoryName}</p>
+                  <InvoiceItemRows items={s.items} setEditingInvoiceItem={setEditingInvoiceItem} setDeleteConfirmation={setDeleteConfirmation} />
+                </div>
+              ))}
             </div>
           ))}
         </div>

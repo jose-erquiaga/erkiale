@@ -22,8 +22,8 @@ interface BudgetViewProps {
   budgets: Record<number | string, BudgetItem[]>;
   expenses: Record<number | string, ExpenseItem[]>;
   user: unknown;
-  handleAddBudgetItemFromCatalog: (item: ReturnType<typeof useCatalogHierarchy>['items'][number], qty: number, guildName?: string, roomName?: string) => Promise<boolean | undefined>;
-  handleAddAdHocBudgetItem: (data: { concept: string; qty: number; unit: string; price: number; tipo: CatalogType; guildId?: string; guildName?: string; roomId?: string; roomName?: string }) => Promise<boolean | undefined>;
+  handleAddBudgetItemFromCatalog: (item: ReturnType<typeof useCatalogHierarchy>['items'][number], qty: number, guildName?: string, roomName?: string, subcategoryName?: string) => Promise<boolean | undefined>;
+  handleAddAdHocBudgetItem: (data: { concept: string; qty: number; unit: string; price: number; tipo: CatalogType; guildId?: string; guildName?: string; roomId?: string; roomName?: string; subcategoryId?: string; subcategoryName?: string }) => Promise<boolean | undefined>;
   setEditingBudgetItem: (item: BudgetItem | null) => void;
   setDeleteConfirmation: (value: { id: any; type: string; label: string } | null) => void;
   setIsInvoiceVisible: (value: boolean) => void;
@@ -119,7 +119,12 @@ function BudgetItemsList({ title, items, setEditingBudgetItem, setDeleteConfirma
           {g.rooms.map(r => (
             <div key={r.roomName}>
               <p className="px-6 pl-10 pt-1 pb-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest">{r.roomName}</p>
-              <BudgetItemRows items={r.items} setEditingBudgetItem={setEditingBudgetItem} setDeleteConfirmation={setDeleteConfirmation} />
+              {r.subcategories.map(s => (
+                <div key={s.subcategoryName}>
+                  <p className="px-6 pl-14 pb-1 text-[8px] font-bold text-slate-300 uppercase tracking-widest">{s.subcategoryName}</p>
+                  <BudgetItemRows items={s.items} setEditingBudgetItem={setEditingBudgetItem} setDeleteConfirmation={setDeleteConfirmation} />
+                </div>
+              ))}
             </div>
           ))}
         </div>
@@ -211,7 +216,8 @@ export const BudgetView = ({
     const qty = isM2Task ? measuredTotalM2 : addQty;
     const guildName = sortedGuilds.find(g => g.firebaseId === guildId)?.name;
     const roomName = roomsForGuild.find(r => r.firebaseId === roomId)?.name;
-    const success = await handleAddBudgetItemFromCatalog(item, qty, guildName, roomName);
+    const subcategoryName = subcatsForType.find(s => s.firebaseId === subcategoryId)?.name;
+    const success = await handleAddBudgetItemFromCatalog(item, qty, guildName, roomName, subcategoryName);
     if (success) setIsAddingBudgetItem(false);
   };
 
@@ -221,7 +227,8 @@ export const BudgetView = ({
     if (!concept || !unit) return;
     const guild = sortedGuilds.find(g => g.firebaseId === guildId);
     const room = roomsForGuild.find(r => r.firebaseId === roomId);
-    const success = await handleAddAdHocBudgetItem({ concept, qty: manualQty, unit, price: manualPrice, tipo: 'material', guildId: guild?.firebaseId, guildName: guild?.name, roomId: room?.firebaseId, roomName: room?.name });
+    const subcategory = subcatsForType.find(s => s.firebaseId === subcategoryId);
+    const success = await handleAddAdHocBudgetItem({ concept, qty: manualQty, unit, price: manualPrice, tipo: 'material', guildId: guild?.firebaseId, guildName: guild?.name, roomId: room?.firebaseId, roomName: room?.name, subcategoryId: subcategory?.firebaseId, subcategoryName: subcategory?.name });
     if (success) {
       setManualConcept('');
       setManualQty(1);
@@ -242,8 +249,9 @@ export const BudgetView = ({
     const tipo = formData.get('tipo') as CatalogType;
     const guild = sortedGuilds.find(g => g.firebaseId === guildId);
     const room = roomsForGuild.find(r => r.firebaseId === roomId);
+    const subcategory = subcatsForType.find(s => s.firebaseId === subcategoryId);
 
-    const success = await handleAddAdHocBudgetItem({ concept, qty, unit, price, tipo, guildId: guild?.firebaseId, guildName: guild?.name, roomId: room?.firebaseId, roomName: room?.name });
+    const success = await handleAddAdHocBudgetItem({ concept, qty, unit, price, tipo, guildId: guild?.firebaseId, guildName: guild?.name, roomId: room?.firebaseId, roomName: room?.name, subcategoryId: subcategory?.firebaseId, subcategoryName: subcategory?.name });
     if (success) {
       if (saveAdHocToCatalog && guildId && roomId && subcategoryId) {
         await hierarchy.addItem(guildId, roomId, tipo, subcategoryId, {

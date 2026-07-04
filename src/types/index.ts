@@ -60,6 +60,8 @@ export interface BudgetItem {
   guildName?: string;
   roomId?: string;
   roomName?: string;
+  subcategoryId?: string;
+  subcategoryName?: string;
 }
 
 export type ExpensePaymentMethod = 'efectivo' | 'tarjeta' | 'transferencia' | 'a_cuenta';
