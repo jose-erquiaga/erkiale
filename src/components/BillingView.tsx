@@ -1,7 +1,9 @@
 import React from 'react';
 import { Receipt, Hammer, X } from 'lucide-react';
-import { motion } from 'motion/react';
-import type { Project, BudgetItem } from '../types';
+import { motion, AnimatePresence } from 'motion/react';
+import { doc, setDoc } from 'firebase/firestore';
+import type { Project, BudgetItem, CompanyInfo } from '../types';
+import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 
 interface BillingViewProps {
   project: Project;
@@ -11,6 +13,84 @@ interface BillingViewProps {
   setEditingInvoiceItem: (item: BudgetItem | null) => void;
   setDeleteConfirmation: (value: { id: any; type: string; label: string } | null) => void;
   setIsInvoiceVisible: (value: boolean) => void;
+  companyInfo: CompanyInfo;
+  isEditingCompany: boolean;
+  setIsEditingCompany: (value: boolean) => void;
+  companyDraft: CompanyInfo;
+  setCompanyDraft: React.Dispatch<React.SetStateAction<CompanyInfo>>;
+}
+
+function CompanyInfoCard({ companyInfo, isEditingCompany, setIsEditingCompany, companyDraft, setCompanyDraft }: {
+  companyInfo: CompanyInfo;
+  isEditingCompany: boolean;
+  setIsEditingCompany: (value: boolean) => void;
+  companyDraft: CompanyInfo;
+  setCompanyDraft: React.Dispatch<React.SetStateAction<CompanyInfo>>;
+}) {
+  return (
+    <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl p-8">
+      <div className="flex items-center justify-between mb-5">
+        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Datos de Empresa (Facturas)</h4>
+        <button
+          type="button"
+          onClick={() => { setCompanyDraft(companyInfo); setIsEditingCompany(!isEditingCompany); }}
+          className={`flex items-center gap-2 text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-xl border transition-all ${isEditingCompany ? 'bg-slate-900 text-white border-slate-900' : 'text-slate-500 bg-slate-50 border-slate-200 hover:bg-slate-100'}`}
+        >
+          <Hammer size={11} /> {isEditingCompany ? 'Cancelar' : 'Editar'}
+        </button>
+      </div>
+      <AnimatePresence>
+        {isEditingCompany ? (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              try {
+                await setDoc(doc(db, 'settings', 'global'), { companyInfo: companyDraft }, { merge: true });
+                setIsEditingCompany(false);
+              } catch (err) {
+                handleFirestoreError(err, OperationType.WRITE, 'settings/global');
+              }
+            }} className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-2">
+              {([
+                { field: 'name', label: 'Nombre / Razón social' },
+                { field: 'cif', label: 'CIF / NIF' },
+                { field: 'address', label: 'Dirección' },
+                { field: 'city', label: 'Población y CP' },
+                { field: 'phone', label: 'Teléfono' },
+                { field: 'email', label: 'Email' },
+              ] as { field: keyof CompanyInfo; label: string }[]).map(({ field, label }) => (
+                <div key={field} className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">{label}</label>
+                  <input
+                    value={companyDraft[field]}
+                    onChange={e => setCompanyDraft(prev => ({ ...prev, [field]: e.target.value }))}
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all"
+                  />
+                </div>
+              ))}
+              <div className="md:col-span-2 flex gap-3 pt-2">
+                <button type="submit" className="px-6 py-2.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">
+                  Guardar Datos
+                </button>
+                <button type="button" onClick={() => setIsEditingCompany(false)} className="px-6 py-2.5 border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50 transition-all">
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        ) : (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[11px] leading-relaxed text-slate-600 space-y-0.5">
+            <p className="font-black text-slate-800">{companyInfo.name}</p>
+            {companyInfo.cif && <p>{companyInfo.cif}</p>}
+            {companyInfo.address && <p>{companyInfo.address}</p>}
+            {companyInfo.city && <p>{companyInfo.city}</p>}
+            {companyInfo.phone && <p>Telf. {companyInfo.phone}</p>}
+            {companyInfo.email && <p>{companyInfo.email}</p>}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
 }
 
 function InvoiceItemsTable({ title, items, setEditingInvoiceItem, setDeleteConfirmation }: {
@@ -73,6 +153,11 @@ export const BillingView = ({
   setEditingInvoiceItem,
   setDeleteConfirmation,
   setIsInvoiceVisible,
+  companyInfo,
+  isEditingCompany,
+  setIsEditingCompany,
+  companyDraft,
+  setCompanyDraft,
 }: BillingViewProps) => {
   if (!project) return <div className="p-12 text-center text-slate-400 italic">No hay ningún proyecto seleccionado.</div>;
   const invoiceItems = invoices[selectedProjectId] ?? [];
@@ -82,6 +167,14 @@ export const BillingView = ({
 
   return (
     <div className="space-y-8">
+      <CompanyInfoCard
+        companyInfo={companyInfo}
+        isEditingCompany={isEditingCompany}
+        setIsEditingCompany={setIsEditingCompany}
+        companyDraft={companyDraft}
+        setCompanyDraft={setCompanyDraft}
+      />
+
       <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl overflow-hidden">
         <div className="px-8 py-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
           <div>

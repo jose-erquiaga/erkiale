@@ -71,19 +71,17 @@ export function useProjectSubcollections(user: unknown, selectedProjectId: strin
     };
   }, [user, selectedProjectId, projects]);
 
-  const handleAddBudgetItemFromCatalog = async (catalogItem: HierarchicalCatalogItem, qty: number) => {
-    const concept = catalogItem.mode === 'texto_libre'
-      ? (catalogItem.description || '')
-      : `${catalogItem.largo}×${catalogItem.ancho}${catalogItem.alto ? `×${catalogItem.alto}` : ''} (${catalogItem.totalM2} m²)`;
-
+  const handleAddBudgetItemFromCatalog = async (catalogItem: HierarchicalCatalogItem, qty: number, guildName?: string) => {
     const newItem = {
       id: Date.now(),
-      concept,
+      concept: catalogItem.description,
       qty,
       unit: catalogItem.unit,
       price: catalogItem.price,
       total: qty * catalogItem.price,
       tipo: catalogItem.type,
+      guildId: catalogItem.guildId,
+      ...(guildName ? { guildName } : {}),
     };
 
     try {

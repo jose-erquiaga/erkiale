@@ -1,17 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-export enum ScanType {
-  EXPENSE = 'expense',
-  CATALOG = 'catalog'
-}
-
-export interface ScannedCatalogItem {
-  concept: string;
-  category: string;
-  unit: string;
-  price: number;
-}
-
 export interface ScannedExpenseComponent {
   concept: string;
   quantity: number;
@@ -111,31 +99,6 @@ export const scanExpenseInvoice = async (file: File): Promise<ScannedExpenseDocu
     },
     required: ["provider", "date", "components"]
   };
-
-  return callGemini(file, prompt, schema);
-};
-
-export const scanDocument = async (file: File, type: ScanType): Promise<any[]> => {
-  const prompt = "Extract items for a price catalog from this document or photo. Identify the concept " +
-    "(product/service), unit of measure (m2, ml, ud, kg, etc.), and unit price. Also categorize them.";
-
-  const schema = {
-    type: Type.ARRAY,
-    items: {
-      type: Type.OBJECT,
-      properties: {
-        concept: { type: Type.STRING },
-        category: { type: Type.STRING },
-        unit: { type: Type.STRING },
-        price: { type: Type.NUMBER }
-      },
-      required: ["concept", "category", "unit", "price"]
-    }
-  };
-
-  if (type === ScanType.EXPENSE) {
-    throw new Error("Use scanExpenseInvoice() for expense scans.");
-  }
 
   return callGemini(file, prompt, schema);
 };
