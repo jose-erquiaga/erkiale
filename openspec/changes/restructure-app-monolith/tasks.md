@@ -59,11 +59,11 @@
       into explicit props; verify the projects list tab
 - [x] 5.2 Extract `CalendarWidget` into `src/components/CalendarWidget.tsx` with explicit props;
       verify the company-wide and per-project calendar tabs
-- [ ] 5.3 Extract `BudgetView` into `src/components/BudgetView.tsx` with explicit props; verify
+- [x] 5.3 Extract `BudgetView` into `src/components/BudgetView.tsx` with explicit props; verify
       the budget tab
-- [ ] 5.4 Extract `BillingView` into `src/components/BillingView.tsx` with explicit props; verify
+- [x] 5.4 Extract `BillingView` into `src/components/BillingView.tsx` with explicit props; verify
       the billing tab, including invoice print/PDF
-- [ ] 5.5 Extract `ExpensesView` into `src/components/ExpensesView.tsx` with explicit props;
+- [x] 5.5 Extract `ExpensesView` into `src/components/ExpensesView.tsx` with explicit props;
       verify the expenses tab
 - [ ] 5.6 Extract the dashboard and catalog view JSX (currently inline in `App.tsx`'s render)
       into `src/components/DashboardView.tsx` and `src/components/CatalogView.tsx`; verify both
