@@ -1,9 +1,6 @@
-import React, { useState } from 'react';
-import { Camera, Hammer, X } from 'lucide-react';
-import { collection, addDoc } from 'firebase/firestore';
+import React from 'react';
+import { Camera, Hammer, X, ChevronDown } from 'lucide-react';
 import type { Project, ExpenseItem } from '../types';
-import { scanDocument, ScanType } from '../services/geminiService';
-import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 
 interface ExpensesViewProps {
   project: Project;
@@ -12,6 +9,9 @@ interface ExpensesViewProps {
   setEditingExpenseItem: (item: ExpenseItem | null) => void;
   setDeleteConfirmation: (value: { id: any; type: string; label: string } | null) => void;
   handleSaveExpense: (e: React.FormEvent<HTMLFormElement>) => void;
+  isScanningExpense: boolean;
+  expenseScanError: string | null;
+  handleExpenseScan: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 const PAYMENT_METHOD_LABELS: Record<ExpenseItem['paymentMethod'], string> = {
@@ -21,6 +21,14 @@ const PAYMENT_METHOD_LABELS: Record<ExpenseItem['paymentMethod'], string> = {
   a_cuenta: 'A cuenta',
 };
 
+function SelectChevron() {
+  return (
+    <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+      <ChevronDown size={14} />
+    </div>
+  );
+}
+
 export const ExpensesView = ({
   project,
   selectedProjectId,
@@ -28,54 +36,13 @@ export const ExpensesView = ({
   setEditingExpenseItem,
   setDeleteConfirmation,
   handleSaveExpense,
+  isScanningExpense,
+  expenseScanError,
+  handleExpenseScan,
 }: ExpensesViewProps) => {
   if (!project) return <div className="p-12 text-center text-slate-400 italic">No hay ningún proyecto seleccionado. Crea uno para empezar.</div>;
   const projectExpenses = expenses[selectedProjectId] ?? [];
-  const [isScanning, setIsScanning] = useState(false);
-  const [scanError, setScanError] = useState<string | null>(null);
-  const [tipo, setTipo] = useState<'material' | 'trabajo'>('material');
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsScanning(true);
-    setScanError(null);
-
-    try {
-      const extractedItems = await scanDocument(file, ScanType.EXPENSE);
-      let saved = 0;
-      for (const item of extractedItems) {
-        try {
-          const total = Number(item.total) || 0;
-          const base = Math.round((total / 1.21) * 100) / 100;
-          const iva = Math.round((total - base) * 100) / 100;
-          await addDoc(collection(db, 'projects', String(selectedProjectId), 'expense_items'), {
-            id: Date.now() + Math.random(),
-            tipo: 'material',
-            date: item.date || new Date().toISOString().split('T')[0],
-            provider: item.provider || item.concept || '',
-            concept: item.concept || '',
-            base,
-            iva,
-            total,
-            paymentMethod: 'efectivo',
-          });
-          saved++;
-        } catch {
-          // continue saving remaining items
-        }
-      }
-      if (saved === 0 && extractedItems.length > 0) {
-        setScanError("No se pudieron guardar los gastos. Comprueba tu conexión.");
-      }
-    } catch (error) {
-      console.error("AI Scan Error:", error);
-      setScanError("No se pudo analizar la factura. Inténtalo de nuevo o cárgala manualmente.");
-    } finally {
-      setIsScanning(false);
-    }
-  };
+  const [tipo, setTipo] = React.useState<'material' | 'trabajo'>('material');
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -84,22 +51,22 @@ export const ExpensesView = ({
           <div className="px-8 py-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
             <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest">Gastos Registrados</h4>
             <div className="flex gap-2">
-              <label className={`flex items-center gap-2 text-[10px] font-black cursor-pointer px-4 py-2 rounded-xl transition-all uppercase tracking-widest border border-blue-100 ${isScanning ? 'bg-blue-100' : 'bg-blue-50 text-blue-600'}`}>
-                {isScanning ? "Procesando..." : <><Camera size={14} /> Scanner IA / Foto</>}
+              <label className={`flex items-center gap-2 text-[10px] font-black cursor-pointer px-4 py-2 rounded-xl transition-all uppercase tracking-widest border border-blue-100 ${isScanningExpense ? 'bg-blue-100' : 'bg-blue-50 text-blue-600'}`}>
+                {isScanningExpense ? "Procesando..." : <><Camera size={14} /> Scanner IA / Foto</>}
                 <input
                   type="file"
                   className="hidden"
                   accept="image/*,application/pdf"
                   capture="environment"
-                  onChange={handleFileUpload}
-                  disabled={isScanning}
+                  onChange={handleExpenseScan}
+                  disabled={isScanningExpense}
                 />
               </label>
             </div>
           </div>
 
-          {scanError && (
-            <div className="px-8 py-4 bg-rose-50 border-b border-rose-100 text-rose-700 text-[11px] font-bold">{scanError}</div>
+          {expenseScanError && (
+            <div className="px-8 py-4 bg-rose-50 border-b border-rose-100 text-rose-700 text-[11px] font-bold">{expenseScanError}</div>
           )}
 
           <table className="w-full text-left">
@@ -153,10 +120,13 @@ export const ExpensesView = ({
       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl self-start sticky top-12">
         <h4 className="text-sm font-black uppercase tracking-widest mb-6 px-1">Registrar Nuevo Gasto</h4>
         <form onSubmit={handleSaveExpense} className="space-y-4">
-          <select name="tipo" value={tipo} onChange={e => setTipo(e.target.value as 'material' | 'trabajo')} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold appearance-none">
-            <option value="material">Material</option>
-            <option value="trabajo">Trabajo a realizar</option>
-          </select>
+          <div className="relative">
+            <select name="tipo" value={tipo} onChange={e => setTipo(e.target.value as 'material' | 'trabajo')} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold appearance-none cursor-pointer">
+              <option value="material">Material</option>
+              <option value="trabajo">Trabajo a realizar</option>
+            </select>
+            <SelectChevron />
+          </div>
           <input name="date" type="date" required defaultValue={new Date().toISOString().split('T')[0]} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" />
           <input name="provider" placeholder="Proveedor" required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" />
           <input name="concept" placeholder="Concepto" required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" />
@@ -168,12 +138,15 @@ export const ExpensesView = ({
           ) : (
             <input name="amount" placeholder="Cantidad €" type="number" step="0.01" min="0" required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" />
           )}
-          <select name="paymentMethod" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold appearance-none">
-            <option value="efectivo">Efectivo</option>
-            <option value="tarjeta">Tarjeta</option>
-            <option value="transferencia">Transferencia</option>
-            <option value="a_cuenta">A cuenta</option>
-          </select>
+          <div className="relative">
+            <select name="paymentMethod" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold appearance-none cursor-pointer">
+              <option value="efectivo">Efectivo</option>
+              <option value="tarjeta">Tarjeta</option>
+              <option value="transferencia">Transferencia</option>
+              <option value="a_cuenta">A cuenta</option>
+            </select>
+            <SelectChevron />
+          </div>
           <button type="submit" className="w-full bg-slate-900 text-white p-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl">Añadir Gasto</button>
         </form>
       </div>

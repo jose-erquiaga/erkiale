@@ -12,60 +12,34 @@ export interface ScannedCatalogItem {
   price: number;
 }
 
-export interface ScannedExpenseItem {
+export interface ScannedExpenseComponent {
   concept: string;
+  quantity: number;
+  unitPrice: number;
+  price: number;
+}
+
+export interface ScannedExpenseDocument {
   provider: string;
-  total: number;
   date: string;
+  components: ScannedExpenseComponent[];
 }
 
 const API_KEY = process.env.GEMINI_API_KEY;
 
-export const scanDocument = async (file: File, type: ScanType): Promise<any[]> => {
+async function callGemini(file: File, prompt: string, schema: object): Promise<any> {
   if (!API_KEY) {
     throw new Error("GEMINI_API_KEY no está configurada.");
   }
 
   const ai = new GoogleGenAI({ apiKey: API_KEY });
-  
+
   const reader = new FileReader();
   const base64Promise = new Promise<string>((resolve) => {
     reader.onload = () => resolve((reader.result as string).split(',')[1]);
   });
   reader.readAsDataURL(file);
   const base64Data = await base64Promise;
-
-  const prompt = type === ScanType.EXPENSE
-    ? "Extract expense items from this receipt/invoice. Items should have concept (what was bought), provider (issuing company/store name), total amount, and date."
-    : "Extract items for a price catalog from this document or photo. Identify the concept (product/service), unit of measure (m2, ml, ud, kg, etc.), and unit price. Also categorize them.";
-
-  const schema = type === ScanType.EXPENSE
-    ? {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            concept: { type: Type.STRING },
-            provider: { type: Type.STRING },
-            total: { type: Type.NUMBER },
-            date: { type: Type.STRING, description: "YYYY-MM-DD" }
-          },
-          required: ["concept", "provider", "total", "date"]
-        }
-      }
-    : {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            concept: { type: Type.STRING },
-            category: { type: Type.STRING },
-            unit: { type: Type.STRING },
-            price: { type: Type.NUMBER }
-          },
-          required: ["concept", "category", "unit", "price"]
-        }
-      };
 
   const response = await ai.models.generateContent({
     model: "gemini-2.0-flash",
@@ -84,4 +58,64 @@ export const scanDocument = async (file: File, type: ScanType): Promise<any[]> =
   });
 
   return JSON.parse(response.text);
+}
+
+// Extracts a single invoice/receipt as one provider + one date + every
+// individual line-item component with its own quantity/unit price, so the
+// user can review and correct each component before it becomes an expense.
+export const scanExpenseInvoice = async (file: File): Promise<ScannedExpenseDocument> => {
+  const prompt = "Extract this single invoice/receipt: it has one provider (issuing company/store name) " +
+    "and one date. Return EVERY distinct line-item/component separately, each with its own concept " +
+    "(what was bought), quantity (assume 1 if not stated), unit price, and line total (price). " +
+    "Do NOT collapse multiple lines into a single total. Ignore summary rows like subtotal, IVA, or " +
+    "grand total — those are derived from the components, not components themselves.";
+
+  const schema = {
+    type: Type.OBJECT,
+    properties: {
+      provider: { type: Type.STRING },
+      date: { type: Type.STRING, description: "YYYY-MM-DD" },
+      components: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            concept: { type: Type.STRING },
+            quantity: { type: Type.NUMBER },
+            unitPrice: { type: Type.NUMBER },
+            price: { type: Type.NUMBER }
+          },
+          required: ["concept", "price"]
+        }
+      }
+    },
+    required: ["provider", "date", "components"]
+  };
+
+  return callGemini(file, prompt, schema);
+};
+
+export const scanDocument = async (file: File, type: ScanType): Promise<any[]> => {
+  const prompt = "Extract items for a price catalog from this document or photo. Identify the concept " +
+    "(product/service), unit of measure (m2, ml, ud, kg, etc.), and unit price. Also categorize them.";
+
+  const schema = {
+    type: Type.ARRAY,
+    items: {
+      type: Type.OBJECT,
+      properties: {
+        concept: { type: Type.STRING },
+        category: { type: Type.STRING },
+        unit: { type: Type.STRING },
+        price: { type: Type.NUMBER }
+      },
+      required: ["concept", "category", "unit", "price"]
+    }
+  };
+
+  if (type === ScanType.EXPENSE) {
+    throw new Error("Use scanExpenseInvoice() for expense scans.");
+  }
+
+  return callGemini(file, prompt, schema);
 };
