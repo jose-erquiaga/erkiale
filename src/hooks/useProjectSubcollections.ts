@@ -93,7 +93,7 @@ export function useProjectSubcollections(user: unknown, selectedProjectId: strin
     }
   };
 
-  const handleAddAdHocBudgetItem = async (data: { concept: string; qty: number; unit: string; price: number; tipo: 'tareas' | 'material' }) => {
+  const handleAddAdHocBudgetItem = async (data: { concept: string; qty: number; unit: string; price: number; tipo: 'tareas' | 'material'; guildId?: string; guildName?: string }) => {
     const newItem = {
       id: Date.now(),
       concept: data.concept,
@@ -102,6 +102,8 @@ export function useProjectSubcollections(user: unknown, selectedProjectId: strin
       price: data.price,
       total: data.qty * data.price,
       tipo: data.tipo,
+      ...(data.guildId ? { guildId: data.guildId } : {}),
+      ...(data.guildName ? { guildName: data.guildName } : {}),
     };
 
     try {
