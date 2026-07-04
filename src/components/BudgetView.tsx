@@ -21,7 +21,7 @@ interface BudgetViewProps {
   budgets: Record<number | string, BudgetItem[]>;
   expenses: Record<number | string, ExpenseItem[]>;
   user: unknown;
-  handleAddBudgetItemFromCatalog: (item: ReturnType<typeof useCatalogHierarchy>['items'][number], qty: number) => Promise<boolean | undefined>;
+  handleAddBudgetItemFromCatalog: (item: ReturnType<typeof useCatalogHierarchy>['items'][number], qty: number, guildName?: string) => Promise<boolean | undefined>;
   handleAddAdHocBudgetItem: (data: { concept: string; qty: number; unit: string; price: number; tipo: CatalogType }) => Promise<boolean | undefined>;
   setEditingBudgetItem: (item: BudgetItem | null) => void;
   setDeleteConfirmation: (value: { id: any; type: string; label: string } | null) => void;
@@ -35,69 +35,104 @@ const TYPE_LABELS: Record<CatalogType, string> = {
   material: 'Material',
 };
 
-function BudgetItemsList({ title, items, setEditingBudgetItem, setDeleteConfirmation }: {
-  title: string;
+function BudgetItemRows({ items, setEditingBudgetItem, setDeleteConfirmation }: {
   items: BudgetItem[];
   setEditingBudgetItem: (item: BudgetItem | null) => void;
   setDeleteConfirmation: (value: { id: any; type: string; label: string } | null) => void;
 }) {
   return (
+    <table className="w-full text-left border-collapse">
+      <tbody>
+        {items.map((item, idx) => (
+          <motion.tr
+            key={item.id}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: idx * 0.05 }}
+            className="border-b border-slate-50 hover:bg-blue-50/30 transition-all cursor-default group"
+          >
+            <td className="p-6">
+              <div className="flex flex-col">
+                <span className="text-sm font-bold text-slate-800">{item.concept}</span>
+                <span className="text-[10px] text-slate-400 font-medium uppercase tracking-widest mt-0.5">Código: #{item.id}</span>
+              </div>
+            </td>
+            <td className="p-6 text-sm text-slate-600 font-bold text-center">
+              <span className="bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">{item.qty} {item.unit}</span>
+            </td>
+            <td className="p-6 text-sm text-slate-500 font-medium text-right">{item.price.toFixed(2)}€</td>
+            <td className="p-6 text-sm font-black text-slate-900 text-right">{item.total.toFixed(2)}€</td>
+            <td className="p-6 text-right">
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setEditingBudgetItem(item); }}
+                    className="p-2 text-blue-500 hover:bg-blue-100 rounded-xl transition-colors bg-blue-50/50"
+                    title="Editar Partida"
+                  >
+                    <Hammer size={14}/>
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setDeleteConfirmation({ id: item.firebaseId, type: 'budget', label: item.concept }); }}
+                    className="p-2 text-rose-500 hover:bg-rose-100 rounded-xl transition-colors bg-rose-50/50"
+                    title="Eliminar Partida"
+                  >
+                    <X size={14}/>
+                  </button>
+                </div>
+            </td>
+          </motion.tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function BudgetItemsList({ title, items, setEditingBudgetItem, setDeleteConfirmation, groupByGuild }: {
+  title: string;
+  items: BudgetItem[];
+  setEditingBudgetItem: (item: BudgetItem | null) => void;
+  setDeleteConfirmation: (value: { id: any; type: string; label: string } | null) => void;
+  groupByGuild?: boolean;
+}) {
+  if (items.length === 0) {
+    return (
+      <div>
+        <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-6 pt-6 pb-2">{title}</h5>
+        <div className="p-10 text-center">
+          <div className="flex flex-col items-center gap-2 text-slate-300">
+            <FileText size={32} className="opacity-20" />
+            <p className="text-[10px] font-black uppercase tracking-[0.2em]">Sin partidas</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!groupByGuild) {
+    return (
+      <div>
+        <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-6 pt-6 pb-2">{title}</h5>
+        <BudgetItemRows items={items} setEditingBudgetItem={setEditingBudgetItem} setDeleteConfirmation={setDeleteConfirmation} />
+      </div>
+    );
+  }
+
+  const groups = new Map<string, BudgetItem[]>();
+  items.forEach(item => {
+    const key = item.guildName || 'Sin gremio';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(item);
+  });
+
+  return (
     <div>
       <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-6 pt-6 pb-2">{title}</h5>
-      <table className="w-full text-left border-collapse">
-        <tbody>
-          {items.length === 0 ? (
-            <tr>
-              <td colSpan={5} className="p-10 text-center">
-                <div className="flex flex-col items-center gap-2 text-slate-300">
-                  <FileText size={32} className="opacity-20" />
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em]">Sin partidas</p>
-                </div>
-              </td>
-            </tr>
-          ) : (
-            items.map((item, idx) => (
-              <motion.tr
-                key={item.id}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: idx * 0.05 }}
-                className="border-b border-slate-50 hover:bg-blue-50/30 transition-all cursor-default group"
-              >
-                <td className="p-6">
-                  <div className="flex flex-col">
-                    <span className="text-sm font-bold text-slate-800">{item.concept}</span>
-                    <span className="text-[10px] text-slate-400 font-medium uppercase tracking-widest mt-0.5">Código: #{item.id}</span>
-                  </div>
-                </td>
-                <td className="p-6 text-sm text-slate-600 font-bold text-center">
-                  <span className="bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">{item.qty} {item.unit}</span>
-                </td>
-                <td className="p-6 text-sm text-slate-500 font-medium text-right">{item.price.toFixed(2)}€</td>
-                <td className="p-6 text-sm font-black text-slate-900 text-right">{item.total.toFixed(2)}€</td>
-                <td className="p-6 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setEditingBudgetItem(item); }}
-                        className="p-2 text-blue-500 hover:bg-blue-100 rounded-xl transition-colors bg-blue-50/50"
-                        title="Editar Partida"
-                      >
-                        <Hammer size={14}/>
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setDeleteConfirmation({ id: item.firebaseId, type: 'budget', label: item.concept }); }}
-                        className="p-2 text-rose-500 hover:bg-rose-100 rounded-xl transition-colors bg-rose-50/50"
-                        title="Eliminar Partida"
-                      >
-                        <X size={14}/>
-                      </button>
-                    </div>
-                </td>
-              </motion.tr>
-            ))
-          )}
-        </tbody>
-      </table>
+      {[...groups.entries()].map(([guildName, groupItems]) => (
+        <div key={guildName}>
+          <p className="px-6 pt-4 pb-1 text-[9px] font-black text-blue-500 uppercase tracking-widest">{guildName}</p>
+          <BudgetItemRows items={groupItems} setEditingBudgetItem={setEditingBudgetItem} setDeleteConfirmation={setDeleteConfirmation} />
+        </div>
+      ))}
     </div>
   );
 }
@@ -127,6 +162,10 @@ export const BudgetView = ({
   const [subcategoryId, setSubcategoryId] = useState('');
   const [selectedCatalogItemId, setSelectedCatalogItemId] = useState('');
   const [addQty, setAddQty] = useState(1);
+  const [measureUnidades, setMeasureUnidades] = useState(1);
+  const [measureLargo, setMeasureLargo] = useState(0);
+  const [measureAncho, setMeasureAncho] = useState(0);
+  const [measureAlto, setMeasureAlto] = useState(0);
   const [saveAdHocToCatalog, setSaveAdHocToCatalog] = useState(false);
 
   const sortedGuilds = useMemo(() => [...hierarchy.guilds].sort((a, b) => a.order - b.order), [hierarchy.guilds]);
@@ -167,10 +206,16 @@ export const BudgetView = ({
   const tareasItems = projectBudget.filter(i => i.tipo !== 'material');
   const materialItems = projectBudget.filter(i => i.tipo === 'material');
 
+  const selectedCatalogItem = itemsForSubcategory.find(i => i.firebaseId === selectedCatalogItemId);
+  const isM2Task = type === 'tareas' && selectedCatalogItem?.unit === 'm2';
+  const measuredTotalM2 = Math.round(measureUnidades * measureLargo * measureAncho * 100) / 100;
+
   const handleAddFromCatalog = async () => {
     const item = itemsForSubcategory.find(i => i.firebaseId === selectedCatalogItemId);
     if (!item) return;
-    const success = await handleAddBudgetItemFromCatalog(item, addQty);
+    const qty = isM2Task ? measuredTotalM2 : addQty;
+    const guildName = sortedGuilds.find(g => g.firebaseId === guildId)?.name;
+    const success = await handleAddBudgetItemFromCatalog(item, qty, guildName);
     if (success) setIsAddingBudgetItem(false);
   };
 
@@ -188,12 +233,9 @@ export const BudgetView = ({
     if (success) {
       if (saveAdHocToCatalog && guildId && roomId && subcategoryId) {
         await hierarchy.addItem(guildId, roomId, tipo, subcategoryId, {
-          mode: 'texto_libre',
           description: concept,
           unit,
-          qty,
           price,
-          total: qty * price,
         });
       }
       form.reset();
@@ -329,21 +371,47 @@ export const BudgetView = ({
                        <div className="relative">
                          <select value={selectedCatalogItemId} onChange={e => setSelectedCatalogItemId(e.target.value)} disabled={itemsForSubcategory.length === 0} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm appearance-none disabled:bg-slate-50 cursor-pointer">
                             {itemsForSubcategory.length > 0 ? itemsForSubcategory.map(item => (
-                                <option key={item.firebaseId} value={item.firebaseId}>{item.mode === 'texto_libre' ? item.description : `${item.totalM2}m²`} ({item.price}€/{item.unit})</option>
+                                <option key={item.firebaseId} value={item.firebaseId}>{item.description} ({item.price}€/{item.unit})</option>
                             )) : <option>Sin ítems</option>}
                          </select>
                          <SelectChevron />
                        </div>
                      </div>
-                     <div className="md:col-span-1 space-y-2">
-                       <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Cant.</label>
-                       <input type="number" value={addQty} onChange={e => setAddQty(parseFloat(e.target.value) || 1)} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
-                     </div>
+                     {!isM2Task && (
+                       <div className="md:col-span-1 space-y-2">
+                         <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Cant.</label>
+                         <input type="number" value={addQty} onChange={e => setAddQty(parseFloat(e.target.value) || 1)} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
+                       </div>
+                     )}
                      <div className="md:col-span-1">
                        <button onClick={handleAddFromCatalog} disabled={!selectedCatalogItemId} className="w-full bg-blue-600 text-white p-3 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 disabled:bg-slate-300">
                          Añadir
                        </button>
                      </div>
+                     {isM2Task && (
+                       <div className="md:col-span-12 grid grid-cols-2 md:grid-cols-5 gap-4 items-end bg-white p-4 rounded-xl border border-slate-200">
+                         <div className="space-y-2">
+                           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Unidades</label>
+                           <input type="number" step="1" min="1" value={measureUnidades} onChange={e => setMeasureUnidades(parseFloat(e.target.value) || 1)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
+                         </div>
+                         <div className="space-y-2">
+                           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Longitud (m)</label>
+                           <input type="number" step="0.01" min="0" value={measureLargo} onChange={e => setMeasureLargo(parseFloat(e.target.value) || 0)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
+                         </div>
+                         <div className="space-y-2">
+                           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Anchura (m)</label>
+                           <input type="number" step="0.01" min="0" value={measureAncho} onChange={e => setMeasureAncho(parseFloat(e.target.value) || 0)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
+                         </div>
+                         <div className="space-y-2">
+                           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Altura (m, informativo)</label>
+                           <input type="number" step="0.01" min="0" value={measureAlto} onChange={e => setMeasureAlto(parseFloat(e.target.value) || 0)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
+                         </div>
+                         <div className="space-y-1">
+                           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Total m²</p>
+                           <p className="text-lg font-black text-blue-600">{measuredTotalM2.toFixed(2)} m²</p>
+                         </div>
+                       </div>
+                     )}
                   </div>
                 ) : (
                   <form onSubmit={handleAddAdHoc} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
@@ -392,7 +460,7 @@ export const BudgetView = ({
         </AnimatePresence>
 
         <BudgetItemsList title={TYPE_LABELS.tareas} items={tareasItems} setEditingBudgetItem={setEditingBudgetItem} setDeleteConfirmation={setDeleteConfirmation} />
-        <BudgetItemsList title={TYPE_LABELS.material} items={materialItems} setEditingBudgetItem={setEditingBudgetItem} setDeleteConfirmation={setDeleteConfirmation} />
+        <BudgetItemsList title={TYPE_LABELS.material} items={materialItems} setEditingBudgetItem={setEditingBudgetItem} setDeleteConfirmation={setDeleteConfirmation} groupByGuild />
 
         <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end gap-3 print:hidden">
            <button

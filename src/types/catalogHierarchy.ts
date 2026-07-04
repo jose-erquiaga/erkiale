@@ -22,25 +22,13 @@ export interface Subcategory {
   order: number;
 }
 
-export type CatalogItemMode = 'texto_libre' | 'medidas';
-
 export interface HierarchicalCatalogItem {
   firebaseId: string;
   guildId: string;
   roomId: string;
   type: CatalogType;
   subcategoryId: string;
-  mode: CatalogItemMode;
-  // Modo texto libre
-  description?: string;
-  // Modo medidas
-  largo?: number;
-  ancho?: number;
-  alto?: number;
-  totalM2?: number;
-  // Comunes
+  description: string;
   unit: string;
-  qty: number;
   price: number;
-  total: number;
 }

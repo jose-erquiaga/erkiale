@@ -22,15 +22,6 @@ export interface CompanyInfo {
   email: string;
 }
 
-export interface CatalogItem {
-  id: number;
-  firebaseId?: string;
-  category: string;
-  concept: string;
-  unit: string;
-  price: number;
-}
-
 export interface CalendarEvent {
   id: number;
   firebaseId?: string;
@@ -53,6 +44,9 @@ export interface BudgetItem {
   total: number;
   /** Tareas/Material classification, inherited from the catalog item this was copied from. */
   tipo?: 'tareas' | 'material';
+  /** Guild this item's catalog entry belonged to, denormalized so it survives the guild being renamed/deleted later. */
+  guildId?: string;
+  guildName?: string;
 }
 
 export type ExpensePaymentMethod = 'efectivo' | 'tarjeta' | 'transferencia' | 'a_cuenta';

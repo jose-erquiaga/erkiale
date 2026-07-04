@@ -10,15 +10,12 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   collection,
   doc,
-  setDoc,
-  addDoc,
   deleteDoc,
   getDocs,
 } from 'firebase/firestore';
 
 import { useAuth } from './hooks/useAuth';
 import { useSettings } from './hooks/useSettings';
-import { useCatalog } from './hooks/useCatalog';
 import { useCalendarEvents } from './hooks/useCalendarEvents';
 import { useProjects } from './hooks/useProjects';
 import { useProjectSubcollections } from './hooks/useProjectSubcollections';
@@ -29,24 +26,19 @@ import { CalendarWidget } from './components/CalendarWidget';
 import { BudgetView } from './components/BudgetView';
 import { BillingView } from './components/BillingView';
 import { ExpensesView } from './components/ExpensesView';
-import { CatalogView } from './components/CatalogView';
 import { DashboardView } from './components/DashboardView';
 import { StructureManagerView } from './components/StructureManagerView';
-import { CatalogHierarchyView } from './components/CatalogHierarchyView';
 import { ConfirmDeleteModal } from './components/modals/ConfirmDeleteModal';
 import { EditBudgetItemModal } from './components/modals/EditBudgetItemModal';
 import { CalendarEventModal } from './components/modals/CalendarEventModal';
 import { EditExpenseItemModal } from './components/modals/EditExpenseItemModal';
 import { EditInvoiceItemModal } from './components/modals/EditInvoiceItemModal';
-import { EditCatalogItemModal } from './components/modals/EditCatalogItemModal';
-import { ScannedCatalogPreviewModal } from './components/modals/ScannedCatalogPreviewModal';
 import { ScannedExpensePreviewModal } from './components/modals/ScannedExpensePreviewModal';
 import { InvoicePreviewModal } from './components/modals/InvoicePreviewModal';
 import { NewProjectModal } from './components/modals/NewProjectModal';
 import { db, isAdmin, OperationType, handleFirestoreError } from './lib/firebase';
-import type { CompanyInfo, CatalogItem, CalendarEvent, BudgetItem, ExpenseItem } from './types';
+import type { CompanyInfo, CalendarEvent, BudgetItem, ExpenseItem } from './types';
 import { DEFAULT_COMPANY, PROJECT_COLORS } from './data/constants';
-import { CATALOG_SEED, CATALOG_SEED_CATEGORIES, CATALOG_SEED_UNITS } from './data/catalogSeed';
 
 /**
  * ReformasPro: A comprehensive management tool for renovation projects.
@@ -63,9 +55,8 @@ const App = () => {
   const [projectSubTab, setProjectSubTab] = useState<'budget' | 'calendar'>('budget');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isManagingLists, setIsManagingLists] = useState(false);
 
-  const { categories, units, companyInfo, saveNewCategory: saveNewCategoryFor, saveNewUnit: saveNewUnitFor } = useSettings(user);
+  const { companyInfo } = useSettings(user);
 
   const { projects, handleAddProject: handleAddProjectFor, handleUpdateProjectStatus } = useProjects(user, selectedProjectId, setSelectedProjectId);
   const { events, saveEvent, handleDragOver, handleDrop } = useCalendarEvents(user);
@@ -92,35 +83,13 @@ const App = () => {
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [addingEventDate, setAddingEventDate] = useState<string | null>(null);
   const [editingBudgetItem, setEditingBudgetItem] = useState<BudgetItem | null>(null);
-  const [editingCatalogItem, setEditingCatalogItem] = useState<CatalogItem | null>(null);
-  const [isAddingCategory, setIsAddingCategory] = useState(false);
-  const [isAddingUnit, setIsAddingUnit] = useState(false);
-  const [tempCategory, setTempCategory] = useState('');
-  const [tempUnit, setTempUnit] = useState('');
   const [isInvoiceVisible, setIsInvoiceVisible] = useState(false);
-  const [editingCatName, setEditingCatName] = useState<{old:string;val:string}|null>(null);
-  const [editingUnitName, setEditingUnitName] = useState<{old:string;val:string}|null>(null);
   const [editingInvoiceItem, setEditingInvoiceItem] = useState<BudgetItem | null>(null);
   const [editingExpenseItem, setEditingExpenseItem] = useState<ExpenseItem | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ id: any; type: string; label: string } | null>(null);
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
-  const [isSeedingCatalog, setIsSeedingCatalog] = useState(false);
   const [isEditingCompany, setIsEditingCompany] = useState(false);
   const [companyDraft, setCompanyDraft] = useState<CompanyInfo>(DEFAULT_COMPANY);
-
-  const {
-    catalog,
-    isScanningCatalog,
-    catalogScanError,
-    setCatalogScanError,
-    scannedCatalogPreview,
-    setScannedCatalogPreview,
-    isConfirmingCatalog,
-    handleAddCatalogItem,
-    handleUpdateCatalogItem: handleUpdateCatalogItemFor,
-    handleCatalogScan,
-    handleConfirmScannedCatalog,
-  } = useCatalog(user, categories, units);
 
   // --- HANDLERS ---
   const handleGenerateInvoice = async () => {
@@ -179,14 +148,6 @@ const App = () => {
         await deleteDoc(doc(db, 'projects', String(selectedProjectId), 'expense_items', String(id)));
       } else if (type === 'event') {
         await deleteDoc(doc(db, 'calendar_events', String(id)));
-      } else if (type === 'catalog') {
-        await deleteDoc(doc(db, 'catalog', String(id)));
-      } else if (type === 'category') {
-        const newCats = categories.filter(c => c !== id);
-        await setDoc(doc(db, 'settings', 'global'), { categories: newCats, units }, { merge: true });
-      } else if (type === 'unit') {
-        const newUnits = units.filter(u => u !== id);
-        await setDoc(doc(db, 'settings', 'global'), { categories, units: newUnits }, { merge: true });
       }
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `${type}/${id}`);
@@ -200,68 +161,27 @@ const App = () => {
     setEditingBudgetItem(null);
   };
 
-  const handleUpdateCatalogItem = async (e: React.FormEvent<HTMLFormElement>) => {
-    await handleUpdateCatalogItemFor(editingCatalogItem, e);
-    setEditingCatalogItem(null);
-  };
-
-  const handleSeedCatalog = async () => {
-    if (!isAdmin()) { alert("Solo el administrador puede realizar esta acción."); return; }
-    if (!confirm(`¿Poblar el catálogo con ${CATALOG_SEED.length} partidas en ${CATALOG_SEED_CATEGORIES.length} categorías?\n\nSe añadirán a los items existentes (no se borrará nada).`)) return;
-    setIsSeedingCatalog(true);
-    try {
-      await setDoc(doc(db, 'settings', 'global'), {
-        categories: CATALOG_SEED_CATEGORIES,
-        units: CATALOG_SEED_UNITS
-      }, { merge: true });
-      let count = 0;
-      let errors = 0;
-      for (const item of CATALOG_SEED) {
-        try {
-          await addDoc(collection(db, 'catalog'), { ...item, id: Date.now() + Math.random() });
-          count++;
-        } catch {
-          errors++;
-        }
-      }
-      if (errors > 0) {
-        alert(`Catálogo poblado con ${count} partidas (${errors} fallaron). Revisa la conexión.`);
-      } else {
-        alert(`✓ Catálogo poblado: ${count} partidas en ${CATALOG_SEED_CATEGORIES.length} categorías.`);
-      }
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, 'catalog');
-    } finally {
-      setIsSeedingCatalog(false);
-    }
-  };
-
   const handleResetDatabase = async () => {
     if (!isAdmin()) {
       alert("Solo el administrador puede realizar esta acción.");
       return;
     }
-    
-    if (!confirm("¿ESTÁS SEGURO? Se eliminarán TODOS los proyectos, partidas, gastos y el catálogo de precios por completo. Esta acción no se puede deshacer.")) {
+
+    if (!confirm("¿ESTÁS SEGURO? Se eliminarán TODOS los proyectos, partidas, gastos y eventos por completo. Esta acción no se puede deshacer.")) {
       return;
     }
 
     try {
-      // 1. Clear Catalog
-      for (const item of catalog) {
-        if (item.firebaseId) await deleteDoc(doc(db, 'catalog', item.firebaseId));
-      }
-
-      // 2. Clear Projects (and subcollections)
+      // 1. Clear Projects (and subcollections)
       for (const project of projects) {
         const projId = project.firebaseId || String(project.id);
         // Note: Subcollections need to be deleted manually if we want thorough cleaning
         // but for a "reset", deleting projects is the main part.
-        // Usually you'd use a Cloud Function for recursive delete, 
+        // Usually you'd use a Cloud Function for recursive delete,
         // but here we do a best effort from client.
         const budgetSnap = await getDocs(collection(db, 'projects', projId, 'budget_items'));
         for (const d of budgetSnap.docs) await deleteDoc(d.ref);
-        
+
         const invoiceSnap = await getDocs(collection(db, 'projects', projId, 'invoice_items'));
         for (const d of invoiceSnap.docs) await deleteDoc(d.ref);
 
@@ -271,33 +191,16 @@ const App = () => {
         await deleteDoc(doc(db, 'projects', projId));
       }
 
-      // 3. Clear Events
+      // 2. Clear Events
       for (const event of events) {
         if (event.firebaseId) await deleteDoc(doc(db, 'calendar_events', event.firebaseId));
       }
-
-      // 4. Reset Settings
-      await setDoc(doc(db, 'settings', 'global'), {
-        categories: ['Pintura', 'Escayola', 'Suelos', 'Baños', 'Cocinas', 'Fontanería', 'Electricidad'],
-        units: ['m2', 'ml', 'ud', 'litros', 'm3', 'kg']
-      });
 
       alert("Base de datos reiniciada con éxito.");
       window.location.reload();
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, 'all');
     }
-  };
-  const saveNewCategory = async () => {
-    await saveNewCategoryFor(tempCategory);
-    setTempCategory('');
-    setIsAddingCategory(false);
-  };
-
-  const saveNewUnit = async () => {
-    await saveNewUnitFor(tempUnit);
-    setTempUnit('');
-    setIsAddingUnit(false);
   };
 
   const handleAddProject = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -393,22 +296,6 @@ const App = () => {
         handleUpdateInvoiceItem={handleUpdateInvoiceItem}
       />
 
-      <EditCatalogItemModal
-        editingCatalogItem={editingCatalogItem}
-        setEditingCatalogItem={setEditingCatalogItem}
-        units={units}
-        handleUpdateCatalogItem={handleUpdateCatalogItem}
-      />
-
-      <ScannedCatalogPreviewModal
-        scannedCatalogPreview={scannedCatalogPreview}
-        setScannedCatalogPreview={setScannedCatalogPreview}
-        categories={categories}
-        units={units}
-        isConfirmingCatalog={isConfirmingCatalog}
-        handleConfirmScannedCatalog={handleConfirmScannedCatalog}
-      />
-
       <ScannedExpensePreviewModal
         scannedExpensePreview={scannedExpensePreview}
         setScannedExpensePreview={setScannedExpensePreview}
@@ -436,8 +323,6 @@ const App = () => {
         setActiveTab={setActiveTab}
         activeColor={activeColor}
         handleLogout={handleLogout}
-        handleSeedCatalog={handleSeedCatalog}
-        isSeedingCatalog={isSeedingCatalog}
         handleResetDatabase={handleResetDatabase}
       />
       
@@ -451,14 +336,12 @@ const App = () => {
             transition={{ duration: 0.5 }}
           >
             <h1 className="text-5xl font-black text-[#0F172A] tracking-tighter leading-none mb-3">
-              {activeTab === 'catalog' && "Catálogo Precios"}
               {activeTab === 'budgets' && "Presupuesto Obra"}
               {activeTab === 'global-calendar' && "Agenda de Empresa"}
               {activeTab === 'dashboard' && "Panel General"}
               {activeTab === 'billing' && "Módulo Facturación"}
               {activeTab === 'expenses' && "Tickets y Gastos"}
-              {activeTab === 'structure' && "Gestor de Estructura"}
-              {activeTab === 'catalog-hierarchy' && "Catálogo Jerárquico"}
+              {activeTab === 'structure' && "Catálogo"}
               {activeTab === 'projects' && "Listado Proyectos"}
             </h1>
             <div className="flex items-center gap-3 flex-wrap">
@@ -513,42 +396,6 @@ const App = () => {
                 />
               )}
               
-              {activeTab === 'catalog' && (
-                <CatalogView
-                  catalog={catalog}
-                  categories={categories}
-                  units={units}
-                  companyInfo={companyInfo}
-                  isScanningCatalog={isScanningCatalog}
-                  catalogScanError={catalogScanError}
-                  setCatalogScanError={setCatalogScanError}
-                  handleCatalogScan={handleCatalogScan}
-                  isManagingLists={isManagingLists}
-                  setIsManagingLists={setIsManagingLists}
-                  isAddingCategory={isAddingCategory}
-                  setIsAddingCategory={setIsAddingCategory}
-                  tempCategory={tempCategory}
-                  setTempCategory={setTempCategory}
-                  saveNewCategory={saveNewCategory}
-                  isAddingUnit={isAddingUnit}
-                  setIsAddingUnit={setIsAddingUnit}
-                  tempUnit={tempUnit}
-                  setTempUnit={setTempUnit}
-                  saveNewUnit={saveNewUnit}
-                  editingCatName={editingCatName}
-                  setEditingCatName={setEditingCatName}
-                  editingUnitName={editingUnitName}
-                  setEditingUnitName={setEditingUnitName}
-                  setDeleteConfirmation={setDeleteConfirmation}
-                  isEditingCompany={isEditingCompany}
-                  setIsEditingCompany={setIsEditingCompany}
-                  companyDraft={companyDraft}
-                  setCompanyDraft={setCompanyDraft}
-                  handleAddCatalogItem={handleAddCatalogItem}
-                  setEditingCatalogItem={setEditingCatalogItem}
-                />
-              )}
-
               {activeTab === 'budgets' && (
                 <div>
                   <div className="flex gap-10 mb-10 border-b border-slate-200">
@@ -622,6 +469,11 @@ const App = () => {
                   setEditingInvoiceItem={setEditingInvoiceItem}
                   setDeleteConfirmation={setDeleteConfirmation}
                   setIsInvoiceVisible={setIsInvoiceVisible}
+                  companyInfo={companyInfo}
+                  isEditingCompany={isEditingCompany}
+                  setIsEditingCompany={setIsEditingCompany}
+                  companyDraft={companyDraft}
+                  setCompanyDraft={setCompanyDraft}
                 />
               )}
 
@@ -644,8 +496,6 @@ const App = () => {
               )}
 
               {activeTab === 'structure' && <StructureManagerView user={user} />}
-
-              {activeTab === 'catalog-hierarchy' && <CatalogHierarchyView user={user} />}
             </motion.div>
           </AnimatePresence>
         </div>

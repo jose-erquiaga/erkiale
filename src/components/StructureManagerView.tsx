@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { DndContext, useDraggable, useDroppable, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { Plus, X, Hammer, ChevronDown, ChevronUp, ArrowUp, ArrowDown, AlertCircle, Lock, GripVertical, Copy, Move } from 'lucide-react';
+import { Plus, X, Hammer, ChevronDown, ChevronUp, ArrowUp, ArrowDown, AlertCircle, GripVertical, Copy, Move } from 'lucide-react';
 import { isAdmin } from '../lib/firebase';
 import { useCatalogHierarchy } from '../hooks/useCatalogHierarchy';
 import type { CatalogType, HierarchicalCatalogItem } from '../types/catalogHierarchy';
@@ -32,11 +32,6 @@ interface PendingDrop {
   target: DropPayload;
 }
 
-const itemLabel = (item: HierarchicalCatalogItem) =>
-  item.mode === 'texto_libre'
-    ? (item.description || '(sin descripción)')
-    : `${item.largo ?? '?'}×${item.ancho ?? '?'}${item.alto ? `×${item.alto}` : ''} (${(item.totalM2 ?? 0).toFixed(2)} m²)`;
-
 function DragHandle({ listeners, attributes }: { listeners: ReturnType<typeof useDraggable>['listeners']; attributes: ReturnType<typeof useDraggable>['attributes'] }) {
   return (
     <button type="button" {...listeners} {...attributes} className="p-1.5 text-slate-300 hover:text-slate-500 cursor-grab active:cursor-grabbing touch-none">
@@ -48,20 +43,20 @@ function DragHandle({ listeners, attributes }: { listeners: ReturnType<typeof us
 function ItemBox({ item, onDelete }: { item: HierarchicalCatalogItem; onDelete: () => void }) {
   const { attributes, listeners, setNodeRef, isDragging, transform } = useDraggable({
     id: `item:${item.firebaseId}`,
-    data: { kind: 'item', guildId: item.guildId, roomId: item.roomId, type: item.type, subcategoryId: item.subcategoryId, itemId: item.firebaseId, name: itemLabel(item) } as DragPayload,
+    data: { kind: 'item', guildId: item.guildId, roomId: item.roomId, type: item.type, subcategoryId: item.subcategoryId, itemId: item.firebaseId, name: item.description } as DragPayload,
   });
   return (
     <div ref={setNodeRef} style={{ transform: CSS.Translate.toString(transform) }} className={`flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-100 relative ${isDragging ? 'opacity-40 z-50' : ''}`}>
       <DragHandle listeners={listeners} attributes={attributes} />
-      <span className="flex-1 text-xs font-bold text-slate-700">{itemLabel(item)} <span className="text-slate-300 font-medium">— {item.total.toFixed(2)} €</span></span>
+      <span className="flex-1 text-xs font-bold text-slate-700">{item.description} <span className="text-slate-300 font-medium">— {item.unit} — {item.price.toFixed(2)} €</span></span>
       <button onClick={onDelete} className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg"><X size={11} /></button>
     </div>
   );
 }
 
 function SubcategoryBox({
-  guildId, roomId, type, subcategory, itemCount, subItems, expanded, onToggle,
-  editing, setEditing, onRename, onReorderUp, onReorderDown, canReorderUp, canReorderDown, onDelete, onDeleteItem,
+  guildId, roomId, type, subcategory, itemCount, subItems, expanded, onToggle, admin,
+  editing, setEditing, onRename, onReorderUp, onReorderDown, canReorderUp, canReorderDown, onDelete, onDeleteItem, onAddItem,
 }: {
   guildId: string; roomId: string; type: CatalogType;
   subcategory: { firebaseId: string; name: string; order: number };
@@ -69,6 +64,7 @@ function SubcategoryBox({
   subItems: HierarchicalCatalogItem[];
   expanded: boolean;
   onToggle: () => void;
+  admin: boolean;
   editing: { kind: string; id: string; val: string } | null;
   setEditing: (v: { kind: string; id: string; val: string } | null) => void;
   onRename: (val: string) => void;
@@ -78,6 +74,7 @@ function SubcategoryBox({
   canReorderDown: boolean;
   onDelete: () => void;
   onDeleteItem: (itemId: string) => void;
+  onAddItem: (description: string, unit: string, price: number) => void;
 }) {
   const { attributes, listeners, setNodeRef: setDragRef, isDragging, transform } = useDraggable({
     id: `subcategory:${subcategory.firebaseId}`,
@@ -88,11 +85,12 @@ function SubcategoryBox({
     data: { kind: 'subcategory', guildId, roomId, type, subcategoryId: subcategory.firebaseId, name: subcategory.name } as DropPayload,
   });
   const setRefs = (node: HTMLElement | null) => { setDragRef(node); setDropRef(node); };
+  const [newItem, setNewItem] = useState({ description: '', unit: '', price: '' });
 
   return (
     <div ref={setRefs} style={{ transform: CSS.Translate.toString(transform) }} className={`bg-white rounded-lg border relative ${isOver ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-100'} ${isDragging ? 'opacity-40 z-50' : ''}`}>
       <div className="flex items-center gap-1 p-2">
-        <DragHandle listeners={listeners} attributes={attributes} />
+        {admin && <DragHandle listeners={listeners} attributes={attributes} />}
         <button onClick={onToggle} className="text-slate-400 hover:text-slate-700">
           {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
         </button>
@@ -103,17 +101,36 @@ function SubcategoryBox({
         ) : (
           <span className="flex-1 text-xs font-bold text-slate-700">{subcategory.name} <span className="text-slate-300 font-medium">({itemCount})</span></span>
         )}
-        <button disabled={!canReorderUp} onClick={onReorderUp} className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20"><ArrowUp size={11} /></button>
-        <button disabled={!canReorderDown} onClick={onReorderDown} className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20"><ArrowDown size={11} /></button>
-        <button onClick={() => setEditing({ kind: 'subcategory', id: subcategory.firebaseId, val: subcategory.name })} className="p-1 text-blue-500 hover:bg-blue-50 rounded-lg"><Hammer size={11} /></button>
-        <button onClick={onDelete} className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg"><X size={11} /></button>
+        {admin && (
+          <>
+            <button disabled={!canReorderUp} onClick={onReorderUp} className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20"><ArrowUp size={11} /></button>
+            <button disabled={!canReorderDown} onClick={onReorderDown} className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20"><ArrowDown size={11} /></button>
+            <button onClick={() => setEditing({ kind: 'subcategory', id: subcategory.firebaseId, val: subcategory.name })} className="p-1 text-blue-500 hover:bg-blue-50 rounded-lg"><Hammer size={11} /></button>
+            <button onClick={onDelete} className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg"><X size={11} /></button>
+          </>
+        )}
       </div>
       {expanded && (
         <div className="p-2 pl-6 space-y-1.5 border-t border-slate-50">
-          {subItems.length === 0 && <p className="text-[10px] text-slate-300 italic py-1">Sin ítems. Añádelos desde Catálogo Jerárquico.</p>}
+          {subItems.length === 0 && <p className="text-[10px] text-slate-300 italic py-1">Sin ítems todavía.</p>}
           {subItems.map(item => (
             <ItemBox key={item.firebaseId} item={item} onDelete={() => onDeleteItem(item.firebaseId)} />
           ))}
+          <form onSubmit={e => {
+            e.preventDefault();
+            const description = newItem.description.trim();
+            const unit = newItem.unit.trim();
+            const price = parseFloat(newItem.price);
+            if (description && unit && !isNaN(price)) {
+              onAddItem(description, unit, price);
+              setNewItem({ description: '', unit: '', price: '' });
+            }
+          }} className="flex gap-1.5 mt-1.5">
+            <input value={newItem.description} onChange={e => setNewItem(p => ({ ...p, description: e.target.value }))} placeholder="Concepto..." className="flex-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-blue-100" />
+            <input value={newItem.unit} onChange={e => setNewItem(p => ({ ...p, unit: e.target.value }))} placeholder="Ud. (m2, kg...)" className="w-24 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-blue-100" />
+            <input value={newItem.price} onChange={e => setNewItem(p => ({ ...p, price: e.target.value }))} type="number" step="0.01" min="0" placeholder="Precio €" className="w-24 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-blue-100" />
+            <button type="submit" className="px-3 bg-blue-600 text-white rounded-lg font-black text-[9px] uppercase tracking-widest hover:bg-blue-700">+</button>
+          </form>
         </div>
       )}
     </div>
@@ -121,7 +138,7 @@ function SubcategoryBox({
 }
 
 function RoomBox({
-  guild, room, guildRooms, rIdx, subcategories, items, expanded, onToggle,
+  guild, room, guildRooms, rIdx, subcategories, items, expanded, onToggle, admin,
   editing, setEditing, hierarchy, expandedSubcats, toggleSubcat, setCascadeConfirmation,
 }: {
   guild: { firebaseId: string; name: string };
@@ -132,6 +149,7 @@ function RoomBox({
   items: HierarchicalCatalogItem[];
   expanded: boolean;
   onToggle: () => void;
+  admin: boolean;
   editing: { kind: string; id: string; val: string } | null;
   setEditing: (v: { kind: string; id: string; val: string } | null) => void;
   hierarchy: ReturnType<typeof useCatalogHierarchy>;
@@ -153,7 +171,7 @@ function RoomBox({
   return (
     <div ref={setRefs} style={{ transform: CSS.Translate.toString(transform) }} className={`border rounded-xl overflow-hidden relative ${isOver ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-100'} ${isDragging ? 'opacity-40 z-50' : ''}`}>
       <div className="flex items-center gap-1 p-3 bg-white">
-        <DragHandle listeners={listeners} attributes={attributes} />
+        {admin && <DragHandle listeners={listeners} attributes={attributes} />}
         <button onClick={onToggle} className="text-slate-400 hover:text-slate-700">
           {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </button>
@@ -164,10 +182,14 @@ function RoomBox({
         ) : (
           <span className="flex-1 font-bold text-slate-800 text-sm">{room.name}</span>
         )}
-        <button disabled={rIdx === 0} onClick={() => { hierarchy.reorderRoom(guild.firebaseId, guildRooms[rIdx - 1].firebaseId, room.order); hierarchy.reorderRoom(guild.firebaseId, room.firebaseId, guildRooms[rIdx - 1].order); }} className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20"><ArrowUp size={12} /></button>
-        <button disabled={rIdx === guildRooms.length - 1} onClick={() => { hierarchy.reorderRoom(guild.firebaseId, guildRooms[rIdx + 1].firebaseId, room.order); hierarchy.reorderRoom(guild.firebaseId, room.firebaseId, guildRooms[rIdx + 1].order); }} className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20"><ArrowDown size={12} /></button>
-        <button onClick={() => setEditing({ kind: 'room', id: room.firebaseId, val: room.name })} className="p-1 text-blue-500 hover:bg-blue-50 rounded-lg"><Hammer size={12} /></button>
-        <button onClick={() => setCascadeConfirmation({ label: room.name, itemCount: hierarchy.countItemsUnderRoom(guild.firebaseId, room.firebaseId), onConfirm: () => hierarchy.deleteRoomCascade(guild.firebaseId, room.firebaseId) })} className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg"><X size={12} /></button>
+        {admin && (
+          <>
+            <button disabled={rIdx === 0} onClick={() => { hierarchy.reorderRoom(guild.firebaseId, guildRooms[rIdx - 1].firebaseId, room.order); hierarchy.reorderRoom(guild.firebaseId, room.firebaseId, guildRooms[rIdx - 1].order); }} className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20"><ArrowUp size={12} /></button>
+            <button disabled={rIdx === guildRooms.length - 1} onClick={() => { hierarchy.reorderRoom(guild.firebaseId, guildRooms[rIdx + 1].firebaseId, room.order); hierarchy.reorderRoom(guild.firebaseId, room.firebaseId, guildRooms[rIdx + 1].order); }} className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20"><ArrowDown size={12} /></button>
+            <button onClick={() => setEditing({ kind: 'room', id: room.firebaseId, val: room.name })} className="p-1 text-blue-500 hover:bg-blue-50 rounded-lg"><Hammer size={12} /></button>
+            <button onClick={() => setCascadeConfirmation({ label: room.name, itemCount: hierarchy.countItemsUnderRoom(guild.firebaseId, room.firebaseId), onConfirm: () => hierarchy.deleteRoomCascade(guild.firebaseId, room.firebaseId) })} className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg"><X size={12} /></button>
+          </>
+        )}
       </div>
 
       {expanded && (
@@ -192,6 +214,7 @@ function RoomBox({
                       subItems={items.filter(i => i.subcategoryId === sub.firebaseId)}
                       expanded={expandedSubcats.has(sub.firebaseId)}
                       onToggle={() => toggleSubcat(sub.firebaseId)}
+                      admin={admin}
                       editing={editing}
                       setEditing={setEditing}
                       onRename={val => hierarchy.renameSubcategory(guild.firebaseId, room.firebaseId, type, sub.firebaseId, val)}
@@ -201,6 +224,7 @@ function RoomBox({
                       canReorderDown={sIdx < subcats.length - 1}
                       onDelete={() => setCascadeConfirmation({ label: sub.name, itemCount: hierarchy.countItemsUnderSubcategory(guild.firebaseId, room.firebaseId, type, sub.firebaseId), onConfirm: () => hierarchy.deleteSubcategoryCascade(guild.firebaseId, room.firebaseId, type, sub.firebaseId) })}
                       onDeleteItem={itemId => hierarchy.deleteItem(guild.firebaseId, room.firebaseId, type, sub.firebaseId, itemId)}
+                      onAddItem={(description, unit, price) => hierarchy.addItem(guild.firebaseId, room.firebaseId, type, sub.firebaseId, { description, unit, price })}
                     />
                   ))}
                 </div>
@@ -223,7 +247,7 @@ function RoomBox({
 
 function GuildBox({
   guild, sortedGuilds, gIdx, hierarchy, expandedGuilds, toggleGuild, expandedRooms, toggleRoom,
-  expandedSubcats, toggleSubcat, editing, setEditing, setCascadeConfirmation,
+  expandedSubcats, toggleSubcat, editing, setEditing, setCascadeConfirmation, admin,
 }: {
   guild: { firebaseId: string; name: string; order: number };
   sortedGuilds: { firebaseId: string; order: number }[];
@@ -238,6 +262,7 @@ function GuildBox({
   editing: { kind: string; id: string; val: string } | null;
   setEditing: (v: { kind: string; id: string; val: string } | null) => void;
   setCascadeConfirmation: (v: CascadeConfirmation | null) => void;
+  admin: boolean;
 }) {
   const { setNodeRef: setDropRef, isOver } = useDroppable({
     id: `guild-drop:${guild.firebaseId}`,
@@ -260,12 +285,14 @@ function GuildBox({
         ) : (
           <span className="flex-1 font-black text-slate-900">{guild.name}</span>
         )}
-        <div className="flex items-center gap-1">
-          <button disabled={gIdx === 0} onClick={() => { hierarchy.reorderGuild(sortedGuilds[gIdx - 1].firebaseId, guild.order); hierarchy.reorderGuild(guild.firebaseId, sortedGuilds[gIdx - 1].order); }} className="p-1.5 text-slate-400 hover:text-slate-700 disabled:opacity-20"><ArrowUp size={14} /></button>
-          <button disabled={gIdx === sortedGuilds.length - 1} onClick={() => { hierarchy.reorderGuild(sortedGuilds[gIdx + 1].firebaseId, guild.order); hierarchy.reorderGuild(guild.firebaseId, sortedGuilds[gIdx + 1].order); }} className="p-1.5 text-slate-400 hover:text-slate-700 disabled:opacity-20"><ArrowDown size={14} /></button>
-          <button onClick={() => setEditing({ kind: 'guild', id: guild.firebaseId, val: guild.name })} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg"><Hammer size={14} /></button>
-          <button onClick={() => setCascadeConfirmation({ label: guild.name, itemCount: hierarchy.countItemsUnderGuild(guild.firebaseId), onConfirm: () => hierarchy.deleteGuildCascade(guild.firebaseId) })} className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg"><X size={14} /></button>
-        </div>
+        {admin && (
+          <div className="flex items-center gap-1">
+            <button disabled={gIdx === 0} onClick={() => { hierarchy.reorderGuild(sortedGuilds[gIdx - 1].firebaseId, guild.order); hierarchy.reorderGuild(guild.firebaseId, sortedGuilds[gIdx - 1].order); }} className="p-1.5 text-slate-400 hover:text-slate-700 disabled:opacity-20"><ArrowUp size={14} /></button>
+            <button disabled={gIdx === sortedGuilds.length - 1} onClick={() => { hierarchy.reorderGuild(sortedGuilds[gIdx + 1].firebaseId, guild.order); hierarchy.reorderGuild(guild.firebaseId, sortedGuilds[gIdx + 1].order); }} className="p-1.5 text-slate-400 hover:text-slate-700 disabled:opacity-20"><ArrowDown size={14} /></button>
+            <button onClick={() => setEditing({ kind: 'guild', id: guild.firebaseId, val: guild.name })} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg"><Hammer size={14} /></button>
+            <button onClick={() => setCascadeConfirmation({ label: guild.name, itemCount: hierarchy.countItemsUnderGuild(guild.firebaseId), onConfirm: () => hierarchy.deleteGuildCascade(guild.firebaseId) })} className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg"><X size={14} /></button>
+          </div>
+        )}
       </div>
 
       {isExpanded && (
@@ -286,6 +313,7 @@ function GuildBox({
               items={hierarchy.items.filter(i => i.guildId === guild.firebaseId && i.roomId === room.firebaseId)}
               expanded={expandedRooms.has(room.firebaseId)}
               onToggle={() => toggleRoom(room.firebaseId)}
+              admin={admin}
               editing={editing}
               setEditing={setEditing}
               hierarchy={hierarchy}
@@ -311,15 +339,7 @@ export const StructureManagerView = ({ user }: { user: unknown }) => {
   const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
-
-  if (!isAdmin()) {
-    return (
-      <div className="p-16 text-center text-slate-400 flex flex-col items-center gap-4">
-        <Lock size={40} className="opacity-30" />
-        <p className="text-sm font-bold uppercase tracking-widest">Solo el administrador puede gestionar la estructura</p>
-      </div>
-    );
-  }
+  const admin = isAdmin();
 
   const toggleGuild = (id: string) => setExpandedGuilds(prev => {
     const next = new Set(prev);
@@ -431,7 +451,7 @@ export const StructureManagerView = ({ user }: { user: unknown }) => {
         )}
 
         <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl p-8">
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight mb-1">Gestor de Estructura</h2>
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight mb-1">Catálogo</h2>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-6">Gremios → Estancias → Tipo → Subcategorías → Ítems — arrastra una caja sobre otra para mover o copiar</p>
 
           <form onSubmit={e => { e.preventDefault(); if (newGuildName.trim()) { hierarchy.addGuild(newGuildName.trim()); setNewGuildName(''); } }} className="flex gap-2 mb-6">
@@ -456,6 +476,7 @@ export const StructureManagerView = ({ user }: { user: unknown }) => {
                 editing={editing}
                 setEditing={setEditing}
                 setCascadeConfirmation={setCascadeConfirmation}
+                admin={admin}
               />
             ))}
             {sortedGuilds.length === 0 && (

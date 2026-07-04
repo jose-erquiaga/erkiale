@@ -6,7 +6,6 @@ import {
   User,
   FileText,
   Calendar as CalendarIcon,
-  BookOpen,
   Receipt,
   Ticket,
   Briefcase,
@@ -28,8 +27,6 @@ interface SidebarProps {
   setActiveTab: (tab: string) => void;
   activeColor: string;
   handleLogout: () => void;
-  handleSeedCatalog: () => void;
-  isSeedingCatalog: boolean;
   handleResetDatabase: () => void;
 }
 
@@ -42,8 +39,6 @@ export const Sidebar = ({
   setActiveTab,
   activeColor,
   handleLogout,
-  handleSeedCatalog,
-  isSeedingCatalog,
   handleResetDatabase,
 }: SidebarProps) => (
   <div className="w-64 bg-[#0F172A] h-screen text-white flex flex-col fixed left-0 top-0 z-50 shadow-2xl overflow-y-auto border-r border-slate-800">
@@ -99,13 +94,11 @@ export const Sidebar = ({
       {[
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { id: 'projects', label: 'Proyectos', icon: Briefcase },
-        { id: 'catalog', label: 'Catálogo Precios (Clásico)', icon: BookOpen },
-        { id: 'catalog-hierarchy', label: 'Catálogo Jerárquico', icon: BookOpen },
+        { id: 'structure', label: 'Catálogo', icon: Settings },
         { id: 'budgets', label: 'Presupuesto Activo', icon: FileText },
         { id: 'global-calendar', label: 'Calendario Global', icon: CalendarIcon },
         { id: 'billing', label: 'Facturación', icon: Receipt },
         { id: 'expenses', label: 'Gastos', icon: Ticket },
-        ...(isAdmin() ? [{ id: 'structure', label: 'Estructura', icon: Settings }] : []),
       ].map(item => (
         <button
           key={item.id}
@@ -139,21 +132,12 @@ export const Sidebar = ({
           <LogOut size={16} /> Cerrar Sesión
         </button>
         {isAdmin() && (
-          <>
-            <button
-              onClick={handleSeedCatalog}
-              disabled={isSeedingCatalog}
-              className="w-full mt-2 flex items-center gap-3 p-3 rounded-xl text-emerald-600 hover:text-white hover:bg-emerald-800/40 transition-all text-[9px] font-black uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <BookOpen size={16} /> {isSeedingCatalog ? 'Poblando...' : 'Poblar Catálogo'}
-            </button>
-            <button
-              onClick={handleResetDatabase}
-              className="w-full mt-1 flex items-center gap-3 p-3 rounded-xl text-slate-600 hover:text-white hover:bg-slate-800 transition-all text-[9px] font-black uppercase tracking-widest"
-            >
-              <Database size={16} /> Reiniciar Datos
-            </button>
-          </>
+          <button
+            onClick={handleResetDatabase}
+            className="w-full mt-2 flex items-center gap-3 p-3 rounded-xl text-slate-600 hover:text-white hover:bg-slate-800 transition-all text-[9px] font-black uppercase tracking-widest"
+          >
+            <Database size={16} /> Reiniciar Datos
+          </button>
         )}
       </div>
     </nav>
