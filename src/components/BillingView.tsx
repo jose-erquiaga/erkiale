@@ -111,7 +111,7 @@ function InvoiceItemRows({ items, setEditingInvoiceItem, setDeleteConfirmation }
             className="border-b border-slate-50 hover:bg-emerald-50/10 transition-all cursor-default group"
           >
             <td className="p-6">
-              <span className="text-[9px] font-bold text-slate-900">{item.concept}</span>
+              <span className="text-[9px] font-medium text-slate-900">{item.concept}</span>
             </td>
             <td className="p-6 text-sm text-slate-600 font-bold text-center">
               <span className="bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">{item.qty} {item.unit}</span>
@@ -160,10 +160,10 @@ function InvoiceItemsTable({ title, items, setEditingInvoiceItem, setDeleteConfi
           </div>
           {g.rooms.map(r => (
             <div key={r.roomName}>
-              <p className="px-6 pl-10 pt-1 pb-1 text-[10px] font-bold text-slate-500 uppercase tracking-widest">{r.roomName}</p>
+              <p className="px-6 pl-10 pt-1 pb-1 text-[10px] font-black text-slate-500 uppercase tracking-widest">{r.roomName}</p>
               {r.subcategories.map(s => (
                 <div key={s.subcategoryName}>
-                  <p className="px-6 pl-14 pb-1 text-[9px] font-bold text-slate-500 uppercase tracking-widest">{s.subcategoryName}</p>
+                  <p className="px-6 pl-14 pb-1 text-[9px] font-black text-slate-500 uppercase tracking-widest">{s.subcategoryName}</p>
                   <InvoiceItemRows items={s.items} setEditingInvoiceItem={setEditingInvoiceItem} setDeleteConfirmation={setDeleteConfirmation} />
                 </div>
               ))}
