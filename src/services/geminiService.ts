@@ -26,6 +26,14 @@ export interface ScannedExpenseDocument {
 }
 
 const API_KEY = process.env.GEMINI_API_KEY;
+const MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+
+const isQuotaError = (error: unknown): boolean => {
+  const msg = error instanceof Error ? error.message : String(error);
+  return msg.includes('429') || msg.toLowerCase().includes('quota');
+};
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function callGemini(file: File, prompt: string, schema: object): Promise<any> {
   if (!API_KEY) {
@@ -41,23 +49,35 @@ async function callGemini(file: File, prompt: string, schema: object): Promise<a
   reader.readAsDataURL(file);
   const base64Data = await base64Promise;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-2.0-flash",
-    contents: [
-      {
-        parts: [
-          { text: prompt },
-          { inlineData: { data: base64Data, mimeType: file.type } }
-        ]
-      }
-    ],
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: schema
-    }
-  });
+  // Retries absorb transient per-minute rate-limit spikes; a fully
+  // exhausted free-tier quota still surfaces to the caller after these.
+  const retryDelaysMs = [2000, 5000];
+  for (let attempt = 0; attempt <= retryDelaysMs.length; attempt++) {
+    try {
+      const response = await ai.models.generateContent({
+        model: MODEL,
+        contents: [
+          {
+            parts: [
+              { text: prompt },
+              { inlineData: { data: base64Data, mimeType: file.type } }
+            ]
+          }
+        ],
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: schema
+        }
+      });
 
-  return JSON.parse(response.text);
+      return JSON.parse(response.text);
+    } catch (error) {
+      if (!isQuotaError(error) || attempt === retryDelaysMs.length) {
+        throw error;
+      }
+      await sleep(retryDelaysMs[attempt]);
+    }
+  }
 }
 
 // Extracts a single invoice/receipt as one provider + one date + every
