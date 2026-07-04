@@ -2,6 +2,7 @@ import React from 'react';
 import { FileText, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import type { Project, CompanyInfo, BudgetItem } from '../../types';
+import { groupItemsByGuildAndRoom } from '../../lib/groupBudgetItems';
 
 interface InvoicePreviewModalProps {
   isInvoiceVisible: boolean;
@@ -164,6 +165,7 @@ export const InvoicePreviewModal = ({
                   {(['tareas', 'material'] as const).map(group => {
                     const groupItems = docItems.filter(item => (group === 'material' ? item.tipo === 'material' : item.tipo !== 'material'));
                     if (groupItems.length === 0) return null;
+                    const guildGroups = groupItemsByGuildAndRoom(groupItems);
                     return (
                       <React.Fragment key={group}>
                         <tr>
@@ -171,19 +173,33 @@ export const InvoicePreviewModal = ({
                             {group === 'material' ? 'Material' : 'Tareas a realizar'}
                           </td>
                         </tr>
-                        {groupItems.map(item => (
-                          <tr key={item.id} className="border-b border-slate-100">
-                            <td className="py-4 pr-4">
-                              <p className="font-bold text-slate-900 uppercase">{item.concept}</p>
-                              {item.description && (
-                                <p className="text-[10px] text-slate-600 mt-1 leading-snug whitespace-pre-line">{item.description}</p>
-                              )}
-                            </td>
-                            <td className="py-4 text-right text-slate-700">{item.qty.toFixed(2)}</td>
-                            <td className="py-4 text-right text-slate-700">{item.price.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
-                            <td className="py-4 text-right text-slate-700">21%</td>
-                            <td className="py-4 text-right font-bold text-slate-900">{(item.price * item.qty * 1.21).toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
-                          </tr>
+                        {guildGroups.map(g => (
+                          <React.Fragment key={g.guildName}>
+                            <tr>
+                              <td colSpan={5} className="pt-2 pb-1 pl-2 text-[9px] font-black text-blue-600 uppercase tracking-widest">{g.guildName}</td>
+                            </tr>
+                            {g.rooms.map(r => (
+                              <React.Fragment key={r.roomName}>
+                                <tr>
+                                  <td colSpan={5} className="pb-1 pl-4 text-[9px] font-bold text-slate-400 uppercase tracking-widest">{r.roomName}</td>
+                                </tr>
+                                {r.items.map(item => (
+                                  <tr key={item.id} className="border-b border-slate-100">
+                                    <td className="py-4 pr-4 pl-4">
+                                      <p className="font-bold text-slate-900 uppercase">{item.concept}</p>
+                                      {item.description && (
+                                        <p className="text-[10px] text-slate-600 mt-1 leading-snug whitespace-pre-line">{item.description}</p>
+                                      )}
+                                    </td>
+                                    <td className="py-4 text-right text-slate-700">{item.qty.toFixed(2)}</td>
+                                    <td className="py-4 text-right text-slate-700">{item.price.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
+                                    <td className="py-4 text-right text-slate-700">21%</td>
+                                    <td className="py-4 text-right font-bold text-slate-900">{(item.price * item.qty * 1.21).toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
+                                  </tr>
+                                ))}
+                              </React.Fragment>
+                            ))}
+                          </React.Fragment>
                         ))}
                       </React.Fragment>
                     );

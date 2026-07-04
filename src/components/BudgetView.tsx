@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import type { Project, BudgetItem, ExpenseItem } from '../types';
 import type { CatalogType } from '../types/catalogHierarchy';
 import { useCatalogHierarchy } from '../hooks/useCatalogHierarchy';
+import { groupItemsByGuildAndRoom } from '../lib/groupBudgetItems';
 
 // Native <select> styled with appearance-none needs an explicit chevron —
 // otherwise it's visually indistinguishable from a plain text input.
@@ -21,8 +22,8 @@ interface BudgetViewProps {
   budgets: Record<number | string, BudgetItem[]>;
   expenses: Record<number | string, ExpenseItem[]>;
   user: unknown;
-  handleAddBudgetItemFromCatalog: (item: ReturnType<typeof useCatalogHierarchy>['items'][number], qty: number, guildName?: string) => Promise<boolean | undefined>;
-  handleAddAdHocBudgetItem: (data: { concept: string; qty: number; unit: string; price: number; tipo: CatalogType; guildId?: string; guildName?: string }) => Promise<boolean | undefined>;
+  handleAddBudgetItemFromCatalog: (item: ReturnType<typeof useCatalogHierarchy>['items'][number], qty: number, guildName?: string, roomName?: string) => Promise<boolean | undefined>;
+  handleAddAdHocBudgetItem: (data: { concept: string; qty: number; unit: string; price: number; tipo: CatalogType; guildId?: string; guildName?: string; roomId?: string; roomName?: string }) => Promise<boolean | undefined>;
   setEditingBudgetItem: (item: BudgetItem | null) => void;
   setDeleteConfirmation: (value: { id: any; type: string; label: string } | null) => void;
   setIsInvoiceVisible: (value: boolean) => void;
@@ -87,12 +88,11 @@ function BudgetItemRows({ items, setEditingBudgetItem, setDeleteConfirmation }: 
   );
 }
 
-function BudgetItemsList({ title, items, setEditingBudgetItem, setDeleteConfirmation, groupByGuild }: {
+function BudgetItemsList({ title, items, setEditingBudgetItem, setDeleteConfirmation }: {
   title: string;
   items: BudgetItem[];
   setEditingBudgetItem: (item: BudgetItem | null) => void;
   setDeleteConfirmation: (value: { id: any; type: string; label: string } | null) => void;
-  groupByGuild?: boolean;
 }) {
   if (items.length === 0) {
     return (
@@ -108,29 +108,20 @@ function BudgetItemsList({ title, items, setEditingBudgetItem, setDeleteConfirma
     );
   }
 
-  if (!groupByGuild) {
-    return (
-      <div>
-        <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-6 pt-6 pb-2">{title}</h5>
-        <BudgetItemRows items={items} setEditingBudgetItem={setEditingBudgetItem} setDeleteConfirmation={setDeleteConfirmation} />
-      </div>
-    );
-  }
-
-  const groups = new Map<string, BudgetItem[]>();
-  items.forEach(item => {
-    const key = item.guildName || 'Sin gremio';
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(item);
-  });
+  const guildGroups = groupItemsByGuildAndRoom(items);
 
   return (
     <div>
       <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-6 pt-6 pb-2">{title}</h5>
-      {[...groups.entries()].map(([guildName, groupItems]) => (
-        <div key={guildName}>
-          <p className="px-6 pt-4 pb-1 text-[9px] font-black text-blue-500 uppercase tracking-widest">{guildName}</p>
-          <BudgetItemRows items={groupItems} setEditingBudgetItem={setEditingBudgetItem} setDeleteConfirmation={setDeleteConfirmation} />
+      {guildGroups.map(g => (
+        <div key={g.guildName}>
+          <p className="px-6 pt-4 pb-1 text-[9px] font-black text-blue-500 uppercase tracking-widest">{g.guildName}</p>
+          {g.rooms.map(r => (
+            <div key={r.roomName}>
+              <p className="px-6 pl-10 pt-1 pb-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest">{r.roomName}</p>
+              <BudgetItemRows items={r.items} setEditingBudgetItem={setEditingBudgetItem} setDeleteConfirmation={setDeleteConfirmation} />
+            </div>
+          ))}
         </div>
       ))}
     </div>
@@ -219,7 +210,8 @@ export const BudgetView = ({
     if (!item) return;
     const qty = isM2Task ? measuredTotalM2 : addQty;
     const guildName = sortedGuilds.find(g => g.firebaseId === guildId)?.name;
-    const success = await handleAddBudgetItemFromCatalog(item, qty, guildName);
+    const roomName = roomsForGuild.find(r => r.firebaseId === roomId)?.name;
+    const success = await handleAddBudgetItemFromCatalog(item, qty, guildName, roomName);
     if (success) setIsAddingBudgetItem(false);
   };
 
@@ -228,7 +220,8 @@ export const BudgetView = ({
     const unit = manualUnit.trim();
     if (!concept || !unit) return;
     const guild = sortedGuilds.find(g => g.firebaseId === guildId);
-    const success = await handleAddAdHocBudgetItem({ concept, qty: manualQty, unit, price: manualPrice, tipo: 'material', guildId: guild?.firebaseId, guildName: guild?.name });
+    const room = roomsForGuild.find(r => r.firebaseId === roomId);
+    const success = await handleAddAdHocBudgetItem({ concept, qty: manualQty, unit, price: manualPrice, tipo: 'material', guildId: guild?.firebaseId, guildName: guild?.name, roomId: room?.firebaseId, roomName: room?.name });
     if (success) {
       setManualConcept('');
       setManualQty(1);
@@ -248,8 +241,9 @@ export const BudgetView = ({
     const price = parseFloat(formData.get('price') as string) || 0;
     const tipo = formData.get('tipo') as CatalogType;
     const guild = sortedGuilds.find(g => g.firebaseId === guildId);
+    const room = roomsForGuild.find(r => r.firebaseId === roomId);
 
-    const success = await handleAddAdHocBudgetItem({ concept, qty, unit, price, tipo, guildId: guild?.firebaseId, guildName: guild?.name });
+    const success = await handleAddAdHocBudgetItem({ concept, qty, unit, price, tipo, guildId: guild?.firebaseId, guildName: guild?.name, roomId: room?.firebaseId, roomName: room?.name });
     if (success) {
       if (saveAdHocToCatalog && guildId && roomId && subcategoryId) {
         await hierarchy.addItem(guildId, roomId, tipo, subcategoryId, {
@@ -400,7 +394,7 @@ export const BudgetView = ({
                          </div>
                          <div className="md:col-span-2 space-y-2">
                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Cant.</label>
-                           <input type="number" step="0.01" min="0.01" value={manualQty} onChange={e => setManualQty(parseFloat(e.target.value) || 1)} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
+                           <input type="number" step="0.01" min="0.01" value={manualQty} onChange={e => setManualQty(parseFloat(e.target.value) || 1)} onFocus={e => e.target.select()} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
                          </div>
                          <div className="md:col-span-2 space-y-2">
                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Unidad</label>
@@ -432,7 +426,7 @@ export const BudgetView = ({
                          {!isM2Task && (
                            <div className="md:col-span-1 space-y-2">
                              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Cant.</label>
-                             <input type="number" value={addQty} onChange={e => setAddQty(parseFloat(e.target.value) || 1)} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
+                             <input type="number" value={addQty} onChange={e => setAddQty(parseFloat(e.target.value) || 1)} onFocus={e => e.target.select()} className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
                            </div>
                          )}
                          <div className="md:col-span-1">
@@ -444,7 +438,7 @@ export const BudgetView = ({
                            <div className="md:col-span-12 grid grid-cols-2 md:grid-cols-4 gap-4 items-end bg-white p-4 rounded-xl border border-slate-200">
                              <div className="space-y-2">
                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Unidades</label>
-                               <input type="number" step="1" min="1" value={measureUnidades} onChange={e => setMeasureUnidades(parseFloat(e.target.value) || 1)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
+                               <input type="number" step="1" min="1" value={measureUnidades} onChange={e => setMeasureUnidades(parseFloat(e.target.value) || 1)} onFocus={e => e.target.select()} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-sm" />
                              </div>
                              <div className="space-y-2">
                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Longitud (m)</label>
@@ -510,7 +504,7 @@ export const BudgetView = ({
         </AnimatePresence>
 
         <BudgetItemsList title={TYPE_LABELS.tareas} items={tareasItems} setEditingBudgetItem={setEditingBudgetItem} setDeleteConfirmation={setDeleteConfirmation} />
-        <BudgetItemsList title={TYPE_LABELS.material} items={materialItems} setEditingBudgetItem={setEditingBudgetItem} setDeleteConfirmation={setDeleteConfirmation} groupByGuild />
+        <BudgetItemsList title={TYPE_LABELS.material} items={materialItems} setEditingBudgetItem={setEditingBudgetItem} setDeleteConfirmation={setDeleteConfirmation} />
 
         <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end gap-3 print:hidden">
            <button

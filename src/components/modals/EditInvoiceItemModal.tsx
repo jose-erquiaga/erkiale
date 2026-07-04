@@ -27,11 +27,11 @@ export const EditInvoiceItemModal = ({ editingInvoiceItem, setEditingInvoiceItem
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Cantidad ({editingInvoiceItem.unit})</label>
-                   <input name="qty" type="number" step="0.01" min="0.01" defaultValue={editingInvoiceItem.qty} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
+                   <input name="qty" type="number" step="0.01" min="0.01" defaultValue={editingInvoiceItem.qty} onFocus={e => e.target.select()} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
                 </div>
                 <div className="space-y-2">
                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Precio Ud (€)</label>
-                   <input name="price" type="number" step="0.01" min="0" defaultValue={editingInvoiceItem.price} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
+                   <input name="price" type="number" step="0.01" min="0" defaultValue={editingInvoiceItem.price} onFocus={e => e.target.select()} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all" />
                 </div>
               </div>
               <button type="submit" className="w-full bg-emerald-600 text-white p-5 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 mt-2">Guardar Cambios Factura</button>
