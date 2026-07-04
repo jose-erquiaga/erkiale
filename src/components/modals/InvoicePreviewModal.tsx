@@ -169,24 +169,24 @@ export const InvoicePreviewModal = ({
                     return (
                       <React.Fragment key={group}>
                         <tr>
-                          <td colSpan={5} className="pt-4 pb-1 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                          <td colSpan={5} className="pt-4 pb-1 text-[12px] font-black text-slate-600 uppercase tracking-widest">
                             {group === 'material' ? 'Material' : 'Tareas a realizar'}
                           </td>
                         </tr>
                         {guildGroups.map(g => (
                           <React.Fragment key={g.guildName}>
                             <tr>
-                              <td colSpan={5} className="pt-2 pb-1 pl-2 text-[9px] font-black text-blue-600 uppercase tracking-widest">
+                              <td colSpan={5} className="pt-2 pb-1 pl-2 text-[11px] font-black text-blue-600 uppercase tracking-widest">
                                 <div className="flex justify-between">
                                   <span>{g.guildName}</span>
-                                  <span className="text-slate-500">{g.total.toFixed(2)} €</span>
+                                  <span>{g.total.toFixed(2)} €</span>
                                 </div>
                               </td>
                             </tr>
                             {g.rooms.map(r => (
                               <React.Fragment key={r.roomName}>
                                 <tr>
-                                  <td colSpan={5} className="pb-1 pl-4 text-[9px] font-bold text-slate-400 uppercase tracking-widest">{r.roomName}</td>
+                                  <td colSpan={5} className="pb-1 pl-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">{r.roomName}</td>
                                 </tr>
                                 {r.subcategories.map(s => (
                                   <React.Fragment key={s.subcategoryName}>
@@ -196,7 +196,7 @@ export const InvoicePreviewModal = ({
                                     {s.items.map(item => (
                                       <tr key={item.id} className="border-b border-slate-100">
                                         <td className="py-4 pr-4 pl-6">
-                                          <p className="font-bold text-slate-900 uppercase">{item.concept}</p>
+                                          <p className="text-[9px] font-bold text-slate-900 uppercase">{item.concept}</p>
                                           {item.description && (
                                             <p className="text-[10px] text-slate-600 mt-1 leading-snug whitespace-pre-line">{item.description}</p>
                                           )}
