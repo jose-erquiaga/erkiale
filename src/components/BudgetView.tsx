@@ -22,7 +22,7 @@ interface BudgetViewProps {
   expenses: Record<number | string, ExpenseItem[]>;
   user: unknown;
   handleAddBudgetItemFromCatalog: (item: ReturnType<typeof useCatalogHierarchy>['items'][number], qty: number, guildName?: string) => Promise<boolean | undefined>;
-  handleAddAdHocBudgetItem: (data: { concept: string; qty: number; unit: string; price: number; tipo: CatalogType }) => Promise<boolean | undefined>;
+  handleAddAdHocBudgetItem: (data: { concept: string; qty: number; unit: string; price: number; tipo: CatalogType; guildId?: string; guildName?: string }) => Promise<boolean | undefined>;
   setEditingBudgetItem: (item: BudgetItem | null) => void;
   setDeleteConfirmation: (value: { id: any; type: string; label: string } | null) => void;
   setIsInvoiceVisible: (value: boolean) => void;
@@ -227,7 +227,8 @@ export const BudgetView = ({
     const concept = manualConcept.trim();
     const unit = manualUnit.trim();
     if (!concept || !unit) return;
-    const success = await handleAddAdHocBudgetItem({ concept, qty: manualQty, unit, price: manualPrice, tipo: 'material' });
+    const guild = sortedGuilds.find(g => g.firebaseId === guildId);
+    const success = await handleAddAdHocBudgetItem({ concept, qty: manualQty, unit, price: manualPrice, tipo: 'material', guildId: guild?.firebaseId, guildName: guild?.name });
     if (success) {
       setManualConcept('');
       setManualQty(1);
@@ -246,8 +247,9 @@ export const BudgetView = ({
     const qty = parseFloat(formData.get('qty') as string) || 1;
     const price = parseFloat(formData.get('price') as string) || 0;
     const tipo = formData.get('tipo') as CatalogType;
+    const guild = sortedGuilds.find(g => g.firebaseId === guildId);
 
-    const success = await handleAddAdHocBudgetItem({ concept, qty, unit, price, tipo });
+    const success = await handleAddAdHocBudgetItem({ concept, qty, unit, price, tipo, guildId: guild?.firebaseId, guildName: guild?.name });
     if (success) {
       if (saveAdHocToCatalog && guildId && roomId && subcategoryId) {
         await hierarchy.addItem(guildId, roomId, tipo, subcategoryId, {
