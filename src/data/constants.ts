@@ -9,8 +9,6 @@ export const DEFAULT_COMPANY: CompanyInfo = {
   email: '',
 };
 
-export const DEFAULT_EXPENSE_CATEGORIES = ['Materiales', 'Mano de Obra', 'Herramientas', 'Varios'];
-
 export const PROJECT_COLORS = [
   '#3B82F6', // blue
   '#10B981', // emerald

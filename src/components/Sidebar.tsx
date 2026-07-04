@@ -12,6 +12,7 @@ import {
   Briefcase,
   LogOut,
   Database,
+  Settings,
 } from 'lucide-react';
 import type { Project } from '../types';
 import type { User as FirebaseUser } from 'firebase/auth';
@@ -98,11 +99,13 @@ export const Sidebar = ({
       {[
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { id: 'projects', label: 'Proyectos', icon: Briefcase },
-        { id: 'catalog', label: 'Catálogo Precios', icon: BookOpen },
+        { id: 'catalog', label: 'Catálogo Precios (Clásico)', icon: BookOpen },
+        { id: 'catalog-hierarchy', label: 'Catálogo Jerárquico', icon: BookOpen },
         { id: 'budgets', label: 'Presupuesto Activo', icon: FileText },
         { id: 'global-calendar', label: 'Calendario Global', icon: CalendarIcon },
         { id: 'billing', label: 'Facturación', icon: Receipt },
         { id: 'expenses', label: 'Gastos', icon: Ticket },
+        ...(isAdmin() ? [{ id: 'structure', label: 'Estructura', icon: Settings }] : []),
       ].map(item => (
         <button
           key={item.id}

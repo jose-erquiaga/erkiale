@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { db, isFirebaseConfigured, OperationType, handleFirestoreError } from '../lib/firebase';
-import type { Project, BudgetItem, ExpenseItem, CatalogItem } from '../types';
+import type { Project, BudgetItem, ExpenseItem } from '../types';
+import type { HierarchicalCatalogItem } from '../types/catalogHierarchy';
 
 export function useProjectSubcollections(user: unknown, selectedProjectId: string, projects: Project[]) {
   const [budgets, setBudgets] = useState<Record<number | string, BudgetItem[]>>({});
@@ -49,17 +50,39 @@ export function useProjectSubcollections(user: unknown, selectedProjectId: strin
     };
   }, [user, selectedProjectId, projects]);
 
-  const handleAddBudgetItem = async (catalog: CatalogItem[], catalogItemId: string, qty: number) => {
-    const catalogItem = catalog.find(item => item.firebaseId === catalogItemId);
-    if (!catalogItem) return;
+  const handleAddBudgetItemFromCatalog = async (catalogItem: HierarchicalCatalogItem, qty: number) => {
+    const concept = catalogItem.mode === 'texto_libre'
+      ? (catalogItem.description || '')
+      : `${catalogItem.largo}×${catalogItem.ancho}${catalogItem.alto ? `×${catalogItem.alto}` : ''} (${catalogItem.totalM2} m²)`;
 
     const newItem = {
       id: Date.now(),
-      concept: catalogItem.concept,
-      qty: qty,
+      concept,
+      qty,
       unit: catalogItem.unit,
       price: catalogItem.price,
-      total: qty * catalogItem.price
+      total: qty * catalogItem.price,
+      tipo: catalogItem.type,
+    };
+
+    try {
+      await addDoc(collection(db, 'projects', String(selectedProjectId), 'budget_items'), newItem);
+      return true;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, `projects/${selectedProjectId}/budget_items`);
+      return false;
+    }
+  };
+
+  const handleAddAdHocBudgetItem = async (data: { concept: string; qty: number; unit: string; price: number; tipo: 'tareas' | 'material' }) => {
+    const newItem = {
+      id: Date.now(),
+      concept: data.concept,
+      qty: data.qty,
+      unit: data.unit,
+      price: data.price,
+      total: data.qty * data.price,
+      tipo: data.tipo,
     };
 
     try {
@@ -119,7 +142,8 @@ export function useProjectSubcollections(user: unknown, selectedProjectId: strin
           qty: item.qty,
           unit: item.unit,
           price: item.price,
-          total: item.total
+          total: item.total,
+          tipo: item.tipo,
         });
       }
       return true;
@@ -153,17 +177,21 @@ export function useProjectSubcollections(user: unknown, selectedProjectId: strin
     e.preventDefault();
     const form = e.currentTarget;
     const formData = new FormData(form);
-    const qty = parseFloat(formData.get('qty') as string) || 0;
-    const price = parseFloat(formData.get('price') as string) || 0;
+    const tipo = formData.get('tipo') as 'material' | 'trabajo';
+    const base = parseFloat(formData.get('base') as string) || 0;
+    const iva = parseFloat(formData.get('iva') as string) || 0;
+    const amount = parseFloat(formData.get('amount') as string) || 0;
+    const total = tipo === 'material' ? base + iva : amount;
+
     const data = {
-      concept: formData.get('concept') as string,
-      qty,
-      price,
-      total: qty * price,
-      category: formData.get('category') as string,
+      id: Date.now(),
+      tipo,
       date: formData.get('date') as string,
-      unit: formData.get('unit') as string,
-      id: Date.now()
+      provider: formData.get('provider') as string,
+      concept: formData.get('concept') as string,
+      ...(tipo === 'material' ? { base, iva } : { amount }),
+      total,
+      paymentMethod: formData.get('paymentMethod') as ExpenseItem['paymentMethod'],
     };
 
     try {
@@ -178,22 +206,21 @@ export function useProjectSubcollections(user: unknown, selectedProjectId: strin
     e.preventDefault();
     if (!editingExpenseItem || !editingExpenseItem.firebaseId) return;
     const formData = new FormData(e.currentTarget);
-    const concept = formData.get('concept') as string;
-    const qty = parseFloat(formData.get('qty') as string) || 0;
-    const price = parseFloat(formData.get('price') as string) || 0;
-    const category = formData.get('category') as string;
-    const date = formData.get('date') as string;
-    const unit = formData.get('unit') as string;
+    const tipo = formData.get('tipo') as 'material' | 'trabajo';
+    const base = parseFloat(formData.get('base') as string) || 0;
+    const iva = parseFloat(formData.get('iva') as string) || 0;
+    const amount = parseFloat(formData.get('amount') as string) || 0;
+    const total = tipo === 'material' ? base + iva : amount;
 
     try {
       await updateDoc(doc(db, 'projects', String(selectedProjectId), 'expense_items', editingExpenseItem.firebaseId), {
-        concept,
-        qty,
-        price,
-        total: qty * price,
-        category,
-        date,
-        unit
+        tipo,
+        date: formData.get('date') as string,
+        provider: formData.get('provider') as string,
+        concept: formData.get('concept') as string,
+        ...(tipo === 'material' ? { base, iva, amount: null } : { amount, base: null, iva: null }),
+        total,
+        paymentMethod: formData.get('paymentMethod') as ExpenseItem['paymentMethod'],
       });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `projects/${selectedProjectId}/expense_items/${editingExpenseItem.firebaseId}`);
@@ -204,7 +231,8 @@ export function useProjectSubcollections(user: unknown, selectedProjectId: strin
     budgets,
     invoices,
     expenses,
-    handleAddBudgetItem,
+    handleAddBudgetItemFromCatalog,
+    handleAddAdHocBudgetItem,
     handleUpdateBudgetItem,
     handleGenerateInvoice,
     handleUpdateInvoiceItem,

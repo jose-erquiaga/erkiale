@@ -13,6 +13,10 @@ service cloud.firestore {
               request.auth.token.email == 'milnelas77@gmail.com');
     }
 
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == 'jose.erquiaga@gmail.com';
+    }
+
     // --- VALIDATORS ---
     function isValidProject(data) {
       return data.keys().hasAll(['name', 'status', 'ownerId']) &&
@@ -40,9 +44,40 @@ service cloud.firestore {
     }
 
     function isValidExpenseItem(data) {
-      return data.keys().hasAll(['concept', 'amount']) &&
+      return data.keys().hasAll(['concept', 'date', 'provider', 'tipo', 'total', 'paymentMethod']) &&
              data.concept is string && data.concept.size() > 0 && data.concept.size() <= 300 &&
-             data.amount is number && data.amount >= 0;
+             data.date is string &&
+             data.provider is string &&
+             data.tipo in ['material', 'trabajo'] &&
+             data.total is number && data.total >= 0 &&
+             data.paymentMethod in ['efectivo', 'tarjeta', 'transferencia', 'a_cuenta'];
+    }
+
+    function isValidGuild(data) {
+      return data.keys().hasAll(['name', 'order']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
+             data.order is number;
+    }
+
+    function isValidRoom(data) {
+      return data.keys().hasAll(['name', 'order']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
+             data.order is number;
+    }
+
+    function isValidSubcategory(data) {
+      return data.keys().hasAll(['name', 'order']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
+             data.order is number;
+    }
+
+    function isValidHierarchicalCatalogItem(data) {
+      return data.keys().hasAll(['mode', 'unit', 'qty', 'price', 'total']) &&
+             data.mode in ['texto_libre', 'medidas'] &&
+             data.unit is string && data.unit.size() > 0 &&
+             data.qty is number && data.qty > 0 &&
+             data.price is number && data.price >= 0 &&
+             data.total is number && data.total >= 0;
     }
 
     function isValidCalendarEvent(data) {
@@ -100,6 +135,44 @@ service cloud.firestore {
 
     match /settings/{docId} {
       allow read, write: if isSignedIn();
+    }
+
+    // --- CATALOG HIERARCHY (Gremio -> Estancia -> Tipo -> Subcategoria -> Item) ---
+    // Read: any signed-in user (catalog + budgets need to browse it).
+    // Create: any signed-in user (the catalog flow lets anyone quick-add a new
+    //   Gremio/Estancia/Subcategoria while creating an item — an additive
+    //   convenience, not a structural edit).
+    // Rename/reorder/delete: admin only, via the Structure Manager panel.
+    match /guilds/{guildId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidGuild(incoming());
+      allow update: if isAdmin() && isValidGuild(incoming());
+      allow delete: if isAdmin();
+
+      match /rooms/{roomId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && isValidRoom(incoming());
+        allow update: if isAdmin() && isValidRoom(incoming());
+        allow delete: if isAdmin();
+
+        match /types/{typeId} {
+          allow read: if isSignedIn();
+          allow write: if isAdmin();
+
+          match /subcategories/{subcategoryId} {
+            allow read: if isSignedIn();
+            allow create: if isSignedIn() && isValidSubcategory(incoming());
+            allow update: if isAdmin() && isValidSubcategory(incoming());
+            allow delete: if isAdmin();
+
+            match /items/{itemId} {
+              allow read: if isSignedIn();
+              allow create, update: if isSignedIn() && isValidHierarchicalCatalogItem(incoming());
+              allow delete: if isSignedIn();
+            }
+          }
+        }
+      }
     }
   }
 }

@@ -31,6 +31,8 @@ import { BillingView } from './components/BillingView';
 import { ExpensesView } from './components/ExpensesView';
 import { CatalogView } from './components/CatalogView';
 import { DashboardView } from './components/DashboardView';
+import { StructureManagerView } from './components/StructureManagerView';
+import { CatalogHierarchyView } from './components/CatalogHierarchyView';
 import { ConfirmDeleteModal } from './components/modals/ConfirmDeleteModal';
 import { EditBudgetItemModal } from './components/modals/EditBudgetItemModal';
 import { CalendarEventModal } from './components/modals/CalendarEventModal';
@@ -62,7 +64,7 @@ const App = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isManagingLists, setIsManagingLists] = useState(false);
 
-  const { categories, units, companyInfo, expenseCategories, saveNewCategory: saveNewCategoryFor, saveNewUnit: saveNewUnitFor } = useSettings(user);
+  const { categories, units, companyInfo, saveNewCategory: saveNewCategoryFor, saveNewUnit: saveNewUnitFor } = useSettings(user);
 
   const { projects, handleAddProject: handleAddProjectFor, handleUpdateProjectStatus } = useProjects(user, selectedProjectId, setSelectedProjectId);
   const { events, saveEvent, handleDragOver, handleDrop } = useCalendarEvents(user);
@@ -70,7 +72,8 @@ const App = () => {
     budgets,
     invoices,
     expenses,
-    handleAddBudgetItem: handleAddBudgetItemFor,
+    handleAddBudgetItemFromCatalog,
+    handleAddAdHocBudgetItem,
     handleUpdateBudgetItem: handleUpdateBudgetItemFor,
     handleGenerateInvoice: handleGenerateInvoiceFor,
     handleUpdateInvoiceItem: handleUpdateInvoiceItemFor,
@@ -79,7 +82,6 @@ const App = () => {
   } = useProjectSubcollections(user, selectedProjectId, projects);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [addingEventDate, setAddingEventDate] = useState<string | null>(null);
-  const [isAddingBudgetItem, setIsAddingBudgetItem] = useState(false);
   const [editingBudgetItem, setEditingBudgetItem] = useState<BudgetItem | null>(null);
   const [editingCatalogItem, setEditingCatalogItem] = useState<CatalogItem | null>(null);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
@@ -146,11 +148,6 @@ const App = () => {
     await saveEvent(eventData, editingEvent?.firebaseId);
     setEditingEvent(null);
     setAddingEventDate(null);
-  };
-
-  const handleAddBudgetItem = async (catalogItemId: string, qty: number) => {
-    const success = await handleAddBudgetItemFor(catalog, catalogItemId, qty);
-    if (success) setIsAddingBudgetItem(false);
   };
 
   const confirmDelete = async () => {
@@ -378,7 +375,6 @@ const App = () => {
       <EditExpenseItemModal
         editingExpenseItem={editingExpenseItem}
         setEditingExpenseItem={setEditingExpenseItem}
-        expenseCategories={expenseCategories}
         handleUpdateExpenseItem={handleUpdateExpenseItem}
       />
 
@@ -445,6 +441,8 @@ const App = () => {
               {activeTab === 'dashboard' && "Panel General"}
               {activeTab === 'billing' && "Módulo Facturación"}
               {activeTab === 'expenses' && "Tickets y Gastos"}
+              {activeTab === 'structure' && "Gestor de Estructura"}
+              {activeTab === 'catalog-hierarchy' && "Catálogo Jerárquico"}
               {activeTab === 'projects' && "Listado Proyectos"}
             </h1>
             <div className="flex items-center gap-3 flex-wrap">
@@ -505,7 +503,6 @@ const App = () => {
                   categories={categories}
                   units={units}
                   companyInfo={companyInfo}
-                  expenseCategories={expenseCategories}
                   isScanningCatalog={isScanningCatalog}
                   catalogScanError={catalogScanError}
                   setCatalogScanError={setCatalogScanError}
@@ -560,11 +557,9 @@ const App = () => {
                       selectedProjectId={selectedProjectId}
                       budgets={budgets}
                       expenses={expenses}
-                      categories={categories}
-                      catalog={catalog}
-                      isAddingBudgetItem={isAddingBudgetItem}
-                      setIsAddingBudgetItem={setIsAddingBudgetItem}
-                      handleAddBudgetItem={handleAddBudgetItem}
+                      user={user}
+                      handleAddBudgetItemFromCatalog={handleAddBudgetItemFromCatalog}
+                      handleAddAdHocBudgetItem={handleAddAdHocBudgetItem}
                       setEditingBudgetItem={setEditingBudgetItem}
                       setDeleteConfirmation={setDeleteConfirmation}
                       setIsInvoiceVisible={setIsInvoiceVisible}
@@ -619,15 +614,19 @@ const App = () => {
                   project={selectedProject}
                   selectedProjectId={selectedProjectId}
                   expenses={expenses}
-                  expenseCategories={expenseCategories}
                   setEditingExpenseItem={setEditingExpenseItem}
                   setDeleteConfirmation={setDeleteConfirmation}
+                  handleSaveExpense={handleSaveExpense}
                 />
               )}
 
               {activeTab === 'dashboard' && (
                 <DashboardView projects={projects} budgets={budgets} events={events} />
               )}
+
+              {activeTab === 'structure' && <StructureManagerView user={user} />}
+
+              {activeTab === 'catalog-hierarchy' && <CatalogHierarchyView user={user} />}
             </motion.div>
           </AnimatePresence>
         </div>

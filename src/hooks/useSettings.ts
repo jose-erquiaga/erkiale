@@ -2,13 +2,12 @@ import { useState, useEffect } from 'react';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db, isFirebaseConfigured, OperationType, handleFirestoreError } from '../lib/firebase';
 import type { CompanyInfo } from '../types';
-import { DEFAULT_COMPANY, DEFAULT_EXPENSE_CATEGORIES } from '../data/constants';
+import { DEFAULT_COMPANY } from '../data/constants';
 
 export function useSettings(user: unknown) {
   const [categories, setCategories] = useState<string[]>(['Pintura', 'Escayola', 'Suelos', 'Baños', 'Cocinas', 'Fontanería', 'Electricidad']);
   const [units, setUnits] = useState<string[]>(['m2', 'ml', 'ud', 'litros', 'm3', 'kg']);
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo>(DEFAULT_COMPANY);
-  const [expenseCategories, setExpenseCategories] = useState<string[]>(DEFAULT_EXPENSE_CATEGORIES);
 
   useEffect(() => {
     if (!user || !isFirebaseConfigured || !db) return;
@@ -20,7 +19,6 @@ export function useSettings(user: unknown) {
         if (data.categories) setCategories(data.categories);
         if (data.units) setUnits(data.units);
         if (data.companyInfo) setCompanyInfo(data.companyInfo);
-        if (data.expenseCategories) setExpenseCategories(data.expenseCategories);
       }
     }, (error) => handleFirestoreError(error, OperationType.GET, pathSettings));
 
@@ -63,7 +61,6 @@ export function useSettings(user: unknown) {
     categories,
     units,
     companyInfo,
-    expenseCategories,
     saveNewCategory,
     saveNewUnit,
   };
