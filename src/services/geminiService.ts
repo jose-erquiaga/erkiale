@@ -14,12 +14,9 @@ export interface ScannedCatalogItem {
 
 export interface ScannedExpenseItem {
   concept: string;
-  qty: number;
-  unit: string;
-  price: number;
+  provider: string;
   total: number;
   date: string;
-  category: string;
 }
 
 const API_KEY = process.env.GEMINI_API_KEY;
@@ -38,25 +35,22 @@ export const scanDocument = async (file: File, type: ScanType): Promise<any[]> =
   reader.readAsDataURL(file);
   const base64Data = await base64Promise;
 
-  const prompt = type === ScanType.EXPENSE 
-    ? "Extract items from this receipt/invoice. Items should have concept, quantity, unit, unit price, total, date, and category (Materiales, Mano de Obra, Herramientas, Varios)."
+  const prompt = type === ScanType.EXPENSE
+    ? "Extract expense items from this receipt/invoice. Items should have concept (what was bought), provider (issuing company/store name), total amount, and date."
     : "Extract items for a price catalog from this document or photo. Identify the concept (product/service), unit of measure (m2, ml, ud, kg, etc.), and unit price. Also categorize them.";
 
-  const schema = type === ScanType.EXPENSE 
+  const schema = type === ScanType.EXPENSE
     ? {
         type: Type.ARRAY,
         items: {
           type: Type.OBJECT,
           properties: {
             concept: { type: Type.STRING },
-            qty: { type: Type.NUMBER },
-            unit: { type: Type.STRING },
-            price: { type: Type.NUMBER },
+            provider: { type: Type.STRING },
             total: { type: Type.NUMBER },
-            date: { type: Type.STRING, description: "YYYY-MM-DD" },
-            category: { type: Type.STRING }
+            date: { type: Type.STRING, description: "YYYY-MM-DD" }
           },
-          required: ["concept", "qty", "unit", "price", "total", "date", "category"]
+          required: ["concept", "provider", "total", "date"]
         }
       }
     : {

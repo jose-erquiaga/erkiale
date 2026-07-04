@@ -10,7 +10,6 @@ interface CatalogViewProps {
   categories: string[];
   units: string[];
   companyInfo: CompanyInfo;
-  expenseCategories: string[];
   isScanningCatalog: boolean;
   catalogScanError: string | null;
   setCatalogScanError: (value: string | null) => void;
@@ -45,7 +44,6 @@ export const CatalogView = ({
   categories,
   units,
   companyInfo,
-  expenseCategories,
   isScanningCatalog,
   catalogScanError,
   setCatalogScanError,
@@ -351,44 +349,6 @@ export const CatalogView = ({
              </motion.div>
            )}
          </AnimatePresence>
-       </div>
-
-       {/* ── Categorías de Gasto ── */}
-       <div className="border-t border-slate-100 pt-8 mb-8">
-         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Categorías de Gasto</h4>
-         <div className="flex flex-wrap gap-2 mb-3">
-           {expenseCategories.map(cat => (
-             <div key={cat} className="flex items-center gap-1 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
-               <span className="text-[11px] font-bold text-slate-700">{cat}</span>
-               {expenseCategories.length > 1 && (
-                 <button onClick={async () => {
-                   const updated = expenseCategories.filter(c => c !== cat);
-                   try {
-                     await setDoc(doc(db, 'settings', 'global'), { expenseCategories: updated }, { merge: true });
-                   } catch (err) {
-                     handleFirestoreError(err, OperationType.WRITE, 'settings/global');
-                   }
-                 }} className="p-1 text-rose-400 hover:bg-rose-50 rounded-lg ml-1"><X size={10}/></button>
-               )}
-             </div>
-           ))}
-           <form onSubmit={async (e) => {
-             e.preventDefault();
-             const fd = new FormData(e.currentTarget);
-             const val = (fd.get('newExpCat') as string).trim();
-             if (!val || expenseCategories.includes(val)) return;
-             const updated = [...expenseCategories, val];
-             try {
-               await setDoc(doc(db, 'settings', 'global'), { expenseCategories: updated }, { merge: true });
-               (e.currentTarget as HTMLFormElement).reset();
-             } catch (err) {
-               handleFirestoreError(err, OperationType.WRITE, 'settings/global');
-             }
-           }} className="flex items-center gap-1">
-             <input name="newExpCat" placeholder="Nueva..." className="text-[11px] font-bold bg-white border border-slate-200 rounded-lg px-2 py-1 outline-none focus:ring-2 focus:ring-blue-100 w-24" />
-             <button type="submit" className="p-1 text-emerald-500 hover:bg-emerald-50 rounded-lg"><CheckCircle2 size={14}/></button>
-           </form>
-         </div>
        </div>
 
        <form onSubmit={handleAddCatalogItem} className="grid grid-cols-1 md:grid-cols-12 gap-5 items-end">

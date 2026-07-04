@@ -153,17 +153,21 @@ export function useProjectSubcollections(user: unknown, selectedProjectId: strin
     e.preventDefault();
     const form = e.currentTarget;
     const formData = new FormData(form);
-    const qty = parseFloat(formData.get('qty') as string) || 0;
-    const price = parseFloat(formData.get('price') as string) || 0;
+    const tipo = formData.get('tipo') as 'material' | 'trabajo';
+    const base = parseFloat(formData.get('base') as string) || 0;
+    const iva = parseFloat(formData.get('iva') as string) || 0;
+    const amount = parseFloat(formData.get('amount') as string) || 0;
+    const total = tipo === 'material' ? base + iva : amount;
+
     const data = {
-      concept: formData.get('concept') as string,
-      qty,
-      price,
-      total: qty * price,
-      category: formData.get('category') as string,
+      id: Date.now(),
+      tipo,
       date: formData.get('date') as string,
-      unit: formData.get('unit') as string,
-      id: Date.now()
+      provider: formData.get('provider') as string,
+      concept: formData.get('concept') as string,
+      ...(tipo === 'material' ? { base, iva } : { amount }),
+      total,
+      paymentMethod: formData.get('paymentMethod') as ExpenseItem['paymentMethod'],
     };
 
     try {
@@ -178,22 +182,21 @@ export function useProjectSubcollections(user: unknown, selectedProjectId: strin
     e.preventDefault();
     if (!editingExpenseItem || !editingExpenseItem.firebaseId) return;
     const formData = new FormData(e.currentTarget);
-    const concept = formData.get('concept') as string;
-    const qty = parseFloat(formData.get('qty') as string) || 0;
-    const price = parseFloat(formData.get('price') as string) || 0;
-    const category = formData.get('category') as string;
-    const date = formData.get('date') as string;
-    const unit = formData.get('unit') as string;
+    const tipo = formData.get('tipo') as 'material' | 'trabajo';
+    const base = parseFloat(formData.get('base') as string) || 0;
+    const iva = parseFloat(formData.get('iva') as string) || 0;
+    const amount = parseFloat(formData.get('amount') as string) || 0;
+    const total = tipo === 'material' ? base + iva : amount;
 
     try {
       await updateDoc(doc(db, 'projects', String(selectedProjectId), 'expense_items', editingExpenseItem.firebaseId), {
-        concept,
-        qty,
-        price,
-        total: qty * price,
-        category,
-        date,
-        unit
+        tipo,
+        date: formData.get('date') as string,
+        provider: formData.get('provider') as string,
+        concept: formData.get('concept') as string,
+        ...(tipo === 'material' ? { base, iva, amount: null } : { amount, base: null, iva: null }),
+        total,
+        paymentMethod: formData.get('paymentMethod') as ExpenseItem['paymentMethod'],
       });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `projects/${selectedProjectId}/expense_items/${editingExpenseItem.firebaseId}`);

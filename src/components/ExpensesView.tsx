@@ -9,23 +9,31 @@ interface ExpensesViewProps {
   project: Project;
   selectedProjectId: string;
   expenses: Record<number | string, ExpenseItem[]>;
-  expenseCategories: string[];
   setEditingExpenseItem: (item: ExpenseItem | null) => void;
   setDeleteConfirmation: (value: { id: any; type: string; label: string } | null) => void;
+  handleSaveExpense: (e: React.FormEvent<HTMLFormElement>) => void;
 }
+
+const PAYMENT_METHOD_LABELS: Record<ExpenseItem['paymentMethod'], string> = {
+  efectivo: 'Efectivo',
+  tarjeta: 'Tarjeta',
+  transferencia: 'Transferencia',
+  a_cuenta: 'A cuenta',
+};
 
 export const ExpensesView = ({
   project,
   selectedProjectId,
   expenses,
-  expenseCategories,
   setEditingExpenseItem,
   setDeleteConfirmation,
+  handleSaveExpense,
 }: ExpensesViewProps) => {
   if (!project) return <div className="p-12 text-center text-slate-400 italic">No hay ningún proyecto seleccionado. Crea uno para empezar.</div>;
   const projectExpenses = expenses[selectedProjectId] ?? [];
   const [isScanning, setIsScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [tipo, setTipo] = useState<'material' | 'trabajo'>('material');
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -39,9 +47,19 @@ export const ExpensesView = ({
       let saved = 0;
       for (const item of extractedItems) {
         try {
+          const total = Number(item.total) || 0;
+          const base = Math.round((total / 1.21) * 100) / 100;
+          const iva = Math.round((total - base) * 100) / 100;
           await addDoc(collection(db, 'projects', String(selectedProjectId), 'expense_items'), {
-            ...item,
-            id: Date.now() + Math.random()
+            id: Date.now() + Math.random(),
+            tipo: 'material',
+            date: item.date || new Date().toISOString().split('T')[0],
+            provider: item.provider || item.concept || '',
+            concept: item.concept || '',
+            base,
+            iva,
+            total,
+            paymentMethod: 'efectivo',
           });
           saved++;
         } catch {
@@ -56,32 +74,6 @@ export const ExpensesView = ({
       setScanError("No se pudo analizar la factura. Inténtalo de nuevo o cárgala manualmente.");
     } finally {
       setIsScanning(false);
-    }
-  };
-
-  const handleAddManualExpense = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const form = e.currentTarget;
-    const formData = new FormData(form);
-    const qty = parseFloat(formData.get('qty') as string) || 0;
-    const price = parseFloat(formData.get('price') as string) || 0;
-
-    const newItem = {
-      id: Date.now(),
-      concept: formData.get('concept') as string,
-      qty,
-      unit: formData.get('unit') as string,
-      price,
-      total: qty * price,
-      date: formData.get('date') as string,
-      category: formData.get('category') as string
-    };
-
-    try {
-      await addDoc(collection(db, 'projects', String(selectedProjectId), 'expense_items'), newItem);
-      form.reset();
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, `projects/${selectedProjectId}/expense_items`);
     }
   };
 
@@ -106,19 +98,24 @@ export const ExpensesView = ({
             </div>
           </div>
 
+          {scanError && (
+            <div className="px-8 py-4 bg-rose-50 border-b border-rose-100 text-rose-700 text-[11px] font-bold">{scanError}</div>
+          )}
+
           <table className="w-full text-left">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-100 font-black text-[10px] uppercase text-slate-400">
                 <th className="p-6">Fecha/Concepto</th>
-                <th className="p-6">Categoría</th>
-                <th className="p-6 text-center">Cant.</th>
+                <th className="p-6">Proveedor</th>
+                <th className="p-6 text-center">Tipo</th>
+                <th className="p-6 text-center">Pago</th>
                 <th className="p-6 text-right">Total</th>
                 <th className="p-6"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 text-sm">
               {projectExpenses.length === 0 ? (
-                <tr><td colSpan={5} className="p-12 text-center text-slate-400 italic">No hay gastos registrados</td></tr>
+                <tr><td colSpan={6} className="p-12 text-center text-slate-400 italic">No hay gastos registrados</td></tr>
               ) : (
                 projectExpenses.map(exp => (
                   <tr key={exp.id}>
@@ -126,8 +123,9 @@ export const ExpensesView = ({
                       <div className="font-black text-slate-300 text-[10px] mb-1">{exp.date}</div>
                       <div className="font-bold text-slate-800">{exp.concept}</div>
                     </td>
-                    <td className="p-6 uppercase text-[10px] font-black text-slate-500">{exp.category}</td>
-                    <td className="p-6 text-center font-bold text-slate-600">{exp.qty} {exp.unit}</td>
+                    <td className="p-6 text-slate-600 font-bold">{exp.provider}</td>
+                    <td className="p-6 text-center uppercase text-[10px] font-black text-slate-500">{exp.tipo === 'material' ? 'Material' : 'Trabajo'}</td>
+                    <td className="p-6 text-center uppercase text-[10px] font-black text-slate-500">{PAYMENT_METHOD_LABELS[exp.paymentMethod]}</td>
                     <td className="p-6 text-right font-black text-slate-900">{exp.total.toFixed(2)} €</td>
                     <td className="p-6 text-right">
                       <div className="flex justify-end gap-2">
@@ -154,19 +152,28 @@ export const ExpensesView = ({
       </div>
       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl self-start sticky top-12">
         <h4 className="text-sm font-black uppercase tracking-widest mb-6 px-1">Registrar Nuevo Gasto</h4>
-        <form onSubmit={handleAddManualExpense} className="space-y-4">
+        <form onSubmit={handleSaveExpense} className="space-y-4">
+          <select name="tipo" value={tipo} onChange={e => setTipo(e.target.value as 'material' | 'trabajo')} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold appearance-none">
+            <option value="material">Material</option>
+            <option value="trabajo">Trabajo a realizar</option>
+          </select>
+          <input name="date" type="date" required defaultValue={new Date().toISOString().split('T')[0]} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" />
+          <input name="provider" placeholder="Proveedor" required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" />
           <input name="concept" placeholder="Concepto" required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" />
-          <div className="grid grid-cols-2 gap-4">
-            <select name="category" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold appearance-none">
-              {expenseCategories.map(c => <option key={c}>{c}</option>)}
-            </select>
-            <input name="date" type="date" required defaultValue={new Date().toISOString().split('T')[0]} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" />
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <input name="qty" placeholder="Cant." type="number" step="0.01" min="0.01" required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" />
-            <input name="unit" placeholder="Ud." required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" />
-            <input name="price" placeholder="€/Ud." type="number" step="0.01" min="0" required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" />
-          </div>
+          {tipo === 'material' ? (
+            <div className="grid grid-cols-2 gap-2">
+              <input name="base" placeholder="Base €" type="number" step="0.01" min="0" required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" />
+              <input name="iva" placeholder="IVA €" type="number" step="0.01" min="0" required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" />
+            </div>
+          ) : (
+            <input name="amount" placeholder="Cantidad €" type="number" step="0.01" min="0" required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold" />
+          )}
+          <select name="paymentMethod" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold appearance-none">
+            <option value="efectivo">Efectivo</option>
+            <option value="tarjeta">Tarjeta</option>
+            <option value="transferencia">Transferencia</option>
+            <option value="a_cuenta">A cuenta</option>
+          </select>
           <button type="submit" className="w-full bg-slate-900 text-white p-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl">Añadir Gasto</button>
         </form>
       </div>

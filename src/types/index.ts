@@ -51,17 +51,26 @@ export interface BudgetItem {
   unit: string;
   price: number;
   total: number;
+  /** Tareas/Material classification, inherited from the catalog item this was copied from. */
+  tipo?: 'tareas' | 'material';
 }
+
+export type ExpensePaymentMethod = 'efectivo' | 'tarjeta' | 'transferencia' | 'a_cuenta';
 
 export interface ExpenseItem {
   id: number;
   firebaseId?: string;
   concept: string;
-  qty: number;
-  unit: string;
-  price: number;
-  total: number;
   date: string;
-  category: string;
+  provider: string;
+  tipo: 'material' | 'trabajo';
+  /** Present when tipo === 'material': base imponible. */
+  base?: number;
+  /** Present when tipo === 'material': cuota de IVA. */
+  iva?: number;
+  /** Present when tipo === 'trabajo': importe directo, sin desglose de IVA. */
+  amount?: number;
+  total: number;
+  paymentMethod: ExpensePaymentMethod;
   attachmentUrl?: string;
 }

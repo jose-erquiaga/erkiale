@@ -62,7 +62,7 @@ const App = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isManagingLists, setIsManagingLists] = useState(false);
 
-  const { categories, units, companyInfo, expenseCategories, saveNewCategory: saveNewCategoryFor, saveNewUnit: saveNewUnitFor } = useSettings(user);
+  const { categories, units, companyInfo, saveNewCategory: saveNewCategoryFor, saveNewUnit: saveNewUnitFor } = useSettings(user);
 
   const { projects, handleAddProject: handleAddProjectFor, handleUpdateProjectStatus } = useProjects(user, selectedProjectId, setSelectedProjectId);
   const { events, saveEvent, handleDragOver, handleDrop } = useCalendarEvents(user);
@@ -378,7 +378,6 @@ const App = () => {
       <EditExpenseItemModal
         editingExpenseItem={editingExpenseItem}
         setEditingExpenseItem={setEditingExpenseItem}
-        expenseCategories={expenseCategories}
         handleUpdateExpenseItem={handleUpdateExpenseItem}
       />
 
@@ -505,7 +504,6 @@ const App = () => {
                   categories={categories}
                   units={units}
                   companyInfo={companyInfo}
-                  expenseCategories={expenseCategories}
                   isScanningCatalog={isScanningCatalog}
                   catalogScanError={catalogScanError}
                   setCatalogScanError={setCatalogScanError}
@@ -619,9 +617,9 @@ const App = () => {
                   project={selectedProject}
                   selectedProjectId={selectedProjectId}
                   expenses={expenses}
-                  expenseCategories={expenseCategories}
                   setEditingExpenseItem={setEditingExpenseItem}
                   setDeleteConfirmation={setDeleteConfirmation}
+                  handleSaveExpense={handleSaveExpense}
                 />
               )}
 
