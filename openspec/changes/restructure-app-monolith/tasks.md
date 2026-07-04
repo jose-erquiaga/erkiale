@@ -1,38 +1,44 @@
 ## 1. Firebase, types, and static data
 
-- [ ] 1.1 Create `src/lib/firebase.ts`: move Firebase init (`app`, `db`, `auth`,
+- [x] 1.1 Create `src/lib/firebase.ts`: move Firebase init (`app`, `db`, `auth`,
       `isFirebaseConfigured`, `googleProvider`), `OperationType`, `FirestoreErrorInfo`,
       `handleFirestoreError`, and `isAdmin` out of `App.tsx`; import them back into `App.tsx`
-- [ ] 1.2 Create `src/types/index.ts` (or split per domain): move `Project`, `CompanyInfo`,
+- [x] 1.2 Create `src/types/index.ts` (or split per domain): move `Project`, `CompanyInfo`,
       `CatalogItem`, `CalendarEvent`, `BudgetItem`, `ExpenseItem` interfaces out of `App.tsx`
-- [ ] 1.3 Create `src/data/catalogSeed.ts`: move `CATALOG_SEED`, `CATALOG_SEED_CATEGORIES`,
+- [x] 1.3 Create `src/data/catalogSeed.ts`: move `CATALOG_SEED`, `CATALOG_SEED_CATEGORIES`,
       `CATALOG_SEED_UNITS`
-- [ ] 1.4 Create `src/data/constants.ts`: move `DEFAULT_COMPANY`, `DEFAULT_EXPENSE_CATEGORIES`,
+- [x] 1.4 Create `src/data/constants.ts`: move `DEFAULT_COMPANY`, `DEFAULT_EXPENSE_CATEGORIES`,
       `PROJECT_COLORS`
-- [ ] 1.5 Run `npm run lint` (`tsc --noEmit`) and run the app locally to confirm no behavior
+- [x] 1.5 Run `npm run lint` (`tsc --noEmit`) and run the app locally to confirm no behavior
       changed (login, dashboard load, one tab of each kind)
 
 ## 2. Auth and settings hooks
 
-- [ ] 2.1 Create `src/hooks/useAuth.ts`: move the `user`/`authReady` state, the
+- [x] 2.1 Create `src/hooks/useAuth.ts`: move the `user`/`authReady` state, the
       `onAuthStateChanged` effect, and `handleLogin`/`handleLogout`
-- [ ] 2.2 Wire `useAuth` into `App.tsx`, remove the now-duplicated state/effect/handlers
-- [ ] 2.3 Verify: login with Google, logout, and the "Firebase not configured" fallback state
+- [x] 2.2 Wire `useAuth` into `App.tsx`, remove the now-duplicated state/effect/handlers
+- [x] 2.3 Verify: login with Google, logout, and the "Firebase not configured" fallback state
       still behave the same
-- [ ] 2.4 Create `src/hooks/useSettings.ts`: move the `settings/global` listener and
-      `categories`/`units`/`companyInfo`/`expenseCategories` state, plus the category/unit/company
-      update handlers
-- [ ] 2.5 Wire `useSettings` into `App.tsx`; verify categories/units/company editing still works
+- [x] 2.4 Create `src/hooks/useSettings.ts`: move the `settings/global` listener and
+      `categories`/`units`/`companyInfo`/`expenseCategories` state, plus the category/unit
+      "add new" handlers (rename/delete/company-info writes stay inline in `App.tsx` for now —
+      they'll move naturally when the Catalog view is extracted in task 5.6, since they need
+      `catalog` state that isn't in its own hook yet)
+- [x] 2.5 Wire `useSettings` into `App.tsx`; verify categories/units/company editing still works
 
 ## 3. Catalog and calendar hooks
 
-- [ ] 3.1 Create `src/hooks/useCatalog.ts`: move the `catalog` collection listener and
-      add/update/delete/scan/seed catalog handlers
-- [ ] 3.2 Wire `useCatalog` into `App.tsx`; verify catalog CRUD, catalog scan, and seed-catalog
+- [x] 3.1 Create `src/hooks/useCatalog.ts`: move the `catalog` collection listener and
+      add/update/scan handlers (seed-catalog stays in `App.tsx`: it also writes
+      `categories`/`units` via `settings/global`, a cross-domain admin action; delete-catalog-item
+      stays in `App.tsx`'s shared `confirmDelete`, which spans many domains and will be revisited
+      when the remaining view extractions land)
+- [x] 3.2 Wire `useCatalog` into `App.tsx`; verify catalog CRUD, catalog scan, and seed-catalog
       flows
-- [ ] 3.3 Create `src/hooks/useCalendarEvents.ts`: move the `calendar_events` collection listener
-      and `handleSaveEvent`/`handleDrop`/`handleDragOver`/delete-event logic
-- [ ] 3.4 Wire `useCalendarEvents` into `App.tsx`; verify creating, editing, dragging, and
+- [x] 3.3 Create `src/hooks/useCalendarEvents.ts`: move the `calendar_events` collection listener
+      and `handleSaveEvent`/`handleDrop`/`handleDragOver` logic (delete-event stays in the shared
+      `confirmDelete`, same as other domains)
+- [x] 3.4 Wire `useCalendarEvents` into `App.tsx`; verify creating, editing, dragging, and
       deleting calendar events
 
 ## 4. Projects and per-project subcollection hooks

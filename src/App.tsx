@@ -4,20 +4,20 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { 
-  LayoutDashboard, 
-  Hammer, 
-  Plus, 
-  ChevronLeft, 
-  ChevronRight, 
-  User, 
-  FileText, 
-  Calendar as CalendarIcon, 
-  BookOpen, 
-  Receipt, 
-  Ticket, 
-  Briefcase, 
-  X, 
+import {
+  LayoutDashboard,
+  Hammer,
+  Plus,
+  ChevronLeft,
+  ChevronRight,
+  User,
+  FileText,
+  Calendar as CalendarIcon,
+  BookOpen,
+  Receipt,
+  Ticket,
+  Briefcase,
+  X,
   Camera,
   ArrowRight,
   Clock,
@@ -31,410 +31,35 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-// --- FIREBASE IMPORTS ---
-import { initializeApp } from 'firebase/app';
-import { 
-  getAuth, 
-  onAuthStateChanged, 
-  signInWithPopup, 
-  GoogleAuthProvider, 
-  signOut,
-  User as FirebaseUser
-} from 'firebase/auth';
-import { 
-  getFirestore, 
-  collection, 
-  doc, 
-  setDoc, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  onSnapshot, 
-  query, 
-  where, 
-  getDocFromServer,
+import {
+  collection,
+  doc,
+  setDoc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  onSnapshot,
   getDocs,
-  Timestamp,
-  serverTimestamp
 } from 'firebase/firestore';
-import firebaseConfig from '../firebase-applet-config.json';
 
 import { scanDocument, ScanType } from './services/geminiService';
-
-// --- FIREBASE INIT ---
-let app;
-let db;
-let auth;
-let isFirebaseConfigured = false;
-
-try {
-  if (firebaseConfig && firebaseConfig.apiKey && firebaseConfig.apiKey.length > 0) {
-    app = initializeApp(firebaseConfig);
-    db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-    auth = getAuth(app);
-    isFirebaseConfigured = true;
-
-    // Validate connection to Firestore as per integration guidelines
-    const testConnection = async () => {
-      try {
-        await getDocFromServer(doc(db, 'test', 'connection'));
-      } catch (error) {
-        if (error instanceof Error && error.message.includes('the client is offline')) {
-          console.error("Please check your Firebase configuration or internet connection.");
-        }
-      }
-    };
-    testConnection();
-  }
-} catch (error) {
-  console.error("Firebase initialization failed:", error);
-}
-
-const googleProvider = isFirebaseConfigured ? new GoogleAuthProvider() : null;
-
-// --- ERROR HANDLING ---
-// --- HELPERS ---
-const isAdmin = () => {
-  return auth?.currentUser?.email === 'jose.erquiaga@gmail.com';
-};
-
-enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
-}
-
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId?: string | null;
-    email?: string | null;
-    emailVerified?: boolean | null;
-    isAnonymous?: boolean | null;
-  }
-}
-
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  if (!isFirebaseConfigured) {
-    console.error("Firebase not configured. Error suppressed.");
-    return;
-  }
-  const errMessage = error instanceof Error ? error.message : String(error);
-  const errInfo: FirestoreErrorInfo = {
-    error: errMessage,
-    authInfo: {
-      userId: auth?.currentUser?.uid,
-      email: auth?.currentUser?.email,
-      emailVerified: auth?.currentUser?.emailVerified,
-      isAnonymous: auth?.currentUser?.isAnonymous,
-    },
-    operationType,
-    path
-  }
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  
-  // Show user-friendly alert for permission errors
-  if (errMessage.includes('permission-denied') || errMessage.includes('insufficient permissions')) {
-    alert(`Error de permisos en ${path} (${operationType}). Verifica si tu email tiene acceso.`);
-  }
-
-  throw new Error(JSON.stringify(errInfo));
-}
+import { useAuth } from './hooks/useAuth';
+import { useSettings } from './hooks/useSettings';
+import { useCatalog } from './hooks/useCatalog';
+import { useCalendarEvents } from './hooks/useCalendarEvents';
+import { db, auth, isFirebaseConfigured, isAdmin, OperationType, handleFirestoreError } from './lib/firebase';
+import type { Project, CompanyInfo, CatalogItem, CalendarEvent, BudgetItem, ExpenseItem } from './types';
+import { DEFAULT_COMPANY, DEFAULT_EXPENSE_CATEGORIES, PROJECT_COLORS } from './data/constants';
+import { CATALOG_SEED, CATALOG_SEED_CATEGORIES, CATALOG_SEED_UNITS } from './data/catalogSeed';
 
 /**
  * ReformasPro: A comprehensive management tool for renovation projects.
  */
 
-// --- TYPES ---
-interface Project {
-  id: number;
-  firebaseId?: string;
-  name: string;
-  clientName: string;
-  clientCIF: string;
-  clientAddress: string;
-  clientEmail: string;
-  clientPhone: string;
-  status: 'En curso' | 'Pendiente' | 'Finalizado';
-  category: string;
-  color?: string;
-  ownerId?: string;
-}
-
-interface CompanyInfo {
-  name: string;
-  cif: string;
-  address: string;
-  city: string;
-  phone: string;
-  email: string;
-}
-
-const DEFAULT_COMPANY: CompanyInfo = {
-  name: 'Erkiale S.L',
-  cif: 'B92898287',
-  address: 'Avda Julio Iglesias 3',
-  city: '29660 Nueva Andalucia, Málaga, España',
-  phone: '647462631',
-  email: '',
-};
-
-const DEFAULT_EXPENSE_CATEGORIES = ['Materiales', 'Mano de Obra', 'Herramientas', 'Varios'];
-
-interface CatalogItem {
-  id: number;
-  firebaseId?: string;
-  category: string;
-  concept: string;
-  unit: string;
-  price: number;
-}
-
-interface CalendarEvent {
-  id: number;
-  firebaseId?: string;
-  projectId: number;
-  date: string;
-  time: string;
-  worker: string;
-  task: string;
-  status: 'pendiente' | 'urgente';
-}
-
-interface BudgetItem {
-  id: number;
-  firebaseId?: string;
-  concept: string;
-  description?: string;
-  qty: number;
-  unit: string;
-  price: number;
-  total: number;
-}
-
-interface ExpenseItem {
-  id: number;
-  firebaseId?: string;
-  concept: string;
-  qty: number;
-  unit: string;
-  price: number;
-  total: number;
-  date: string;
-  category: string;
-  attachmentUrl?: string;
-}
-
-const PROJECT_COLORS = [
-  '#3B82F6', // blue
-  '#10B981', // emerald
-  '#F59E0B', // amber
-  '#EF4444', // red
-  '#8B5CF6', // purple
-  '#EC4899', // pink
-  '#06B6D4', // cyan
-  '#F97316', // orange
-];
-
-const CATALOG_SEED: { category: string; concept: string; unit: string; price: number }[] = [
-  // Pintura y Decoración
-  { category:'Pintura y Decoración', concept:'Pintura plástica lisa (2 manos) blanca', unit:'m2', price:7.50 },
-  { category:'Pintura y Decoración', concept:'Pintura plástica lisa (2 manos) color', unit:'m2', price:9.00 },
-  { category:'Pintura y Decoración', concept:'Esmalte sintético en carpintería metálica', unit:'m2', price:14.00 },
-  { category:'Pintura y Decoración', concept:'Quitar gotelé y tendido de plaste', unit:'m2', price:16.50 },
-  { category:'Pintura y Decoración', concept:'Barnizado de puertas de madera', unit:'ud', price:55.00 },
-  { category:'Pintura y Decoración', concept:'Papel pintado (mano de obra)', unit:'m2', price:12.00 },
-  { category:'Pintura y Decoración', concept:'Pintura de fachadas (revestimiento acrílico)', unit:'m2', price:18.00 },
-  { category:'Pintura y Decoración', concept:'Pintura epoxi en suelos', unit:'m2', price:22.00 },
-  { category:'Pintura y Decoración', concept:'Tratamiento antimoho en techos de baño', unit:'m2', price:10.00 },
-  { category:'Pintura y Decoración', concept:'Lacado de puertas en blanco (taller)', unit:'ud', price:110.00 },
-  { category:'Pintura y Decoración', concept:'Pintura de radiadores', unit:'ud', price:25.00 },
-  { category:'Pintura y Decoración', concept:'Pintura de barandillas metálicas', unit:'ml', price:12.00 },
-  { category:'Pintura y Decoración', concept:'Estuco veneciano', unit:'m2', price:45.00 },
-  { category:'Pintura y Decoración', concept:'Limpieza de manchas de humedad y fijador', unit:'m2', price:6.00 },
-  { category:'Pintura y Decoración', concept:'Protección de mobiliario y suelos', unit:'global', price:120.00 },
-  { category:'Pintura y Decoración', concept:'Pintura de bañera con resinas', unit:'ud', price:95.00 },
-  { category:'Pintura y Decoración', concept:'Masillado de grietas y fisuras', unit:'ml', price:4.50 },
-  { category:'Pintura y Decoración', concept:'Barnizado de vigas de madera vista', unit:'ml', price:15.00 },
-  { category:'Pintura y Decoración', concept:'Pintura de garajes (señalización incluida)', unit:'m2', price:11.00 },
-  { category:'Pintura y Decoración', concept:'Suministro y colocación de moldura escayola', unit:'ml', price:14.00 },
-  // Electricidad e Iluminación
-  { category:'Electricidad e Iluminación', concept:'Nuevo punto de luz sencillo', unit:'ud', price:50.00 },
-  { category:'Electricidad e Iluminación', concept:'Punto de enchufe 16A', unit:'ud', price:55.00 },
-  { category:'Electricidad e Iluminación', concept:'Punto de toma de TV o Teléfono', unit:'ud', price:60.00 },
-  { category:'Electricidad e Iluminación', concept:'Cuadro eléctrico 12 elementos (montado)', unit:'ud', price:380.00 },
-  { category:'Electricidad e Iluminación', concept:'Diferencial 2P 40A 30mA', unit:'ud', price:65.00 },
-  { category:'Electricidad e Iluminación', concept:'Instalación de vitrocerámica/horno (toma)', unit:'ud', price:85.00 },
-  { category:'Electricidad e Iluminación', concept:'Punto de red RJ45 Cat6', unit:'ud', price:75.00 },
-  { category:'Electricidad e Iluminación', concept:'Instalación de ventilador de techo', unit:'ud', price:90.00 },
-  { category:'Electricidad e Iluminación', concept:'Montaje de mecanismo (solo mano obra)', unit:'ud', price:8.00 },
-  { category:'Electricidad e Iluminación', concept:'Pulsador con avisador acústico', unit:'ud', price:45.00 },
-  { category:'Electricidad e Iluminación', concept:'Foco empotrable LED (suministro e inst.)', unit:'ud', price:35.00 },
-  { category:'Electricidad e Iluminación', concept:'Tira LED en foseado (mano obra)', unit:'ml', price:18.00 },
-  { category:'Electricidad e Iluminación', concept:'Boletín de enganche', unit:'ud', price:150.00 },
-  { category:'Electricidad e Iluminación', concept:'Instalación de videoportero', unit:'ud', price:280.00 },
-  { category:'Electricidad e Iluminación', concept:'Punto de luz conmutado (2 llaves)', unit:'ud', price:85.00 },
-  { category:'Electricidad e Iluminación', concept:'Extractor de baño', unit:'ud', price:110.00 },
-  { category:'Electricidad e Iluminación', concept:'Canaleta plástica para cables', unit:'ml', price:12.00 },
-  { category:'Electricidad e Iluminación', concept:'Sensor de movimiento', unit:'ud', price:65.00 },
-  { category:'Electricidad e Iluminación', concept:'Acometida general monofásica', unit:'ml', price:40.00 },
-  { category:'Electricidad e Iluminación', concept:'Caja de registro (colocación)', unit:'ud', price:25.00 },
-  // Baños y Fontanería
-  { category:'Baños y Fontanería', concept:'Desmontaje de sanitarios viejos', unit:'ud', price:45.00 },
-  { category:'Baños y Fontanería', concept:'Cambio de bañera por plato ducha (obra)', unit:'ud', price:750.00 },
-  { category:'Baños y Fontanería', concept:'Instalación de inodoro (estándar)', unit:'ud', price:95.00 },
-  { category:'Baños y Fontanería', concept:'Inodoro suspendido (con cisterna empotrada)', unit:'ud', price:320.00 },
-  { category:'Baños y Fontanería', concept:'Grifería de lavabo (montaje)', unit:'ud', price:45.00 },
-  { category:'Baños y Fontanería', concept:'Columna de ducha termostática', unit:'ud', price:180.00 },
-  { category:'Baños y Fontanería', concept:'Mueble de baño y espejo (montaje)', unit:'ud', price:120.00 },
-  { category:'Baños y Fontanería', concept:'Punto de agua (tubería multicapa)', unit:'ud', price:140.00 },
-  { category:'Baños y Fontanería', concept:'Desagüe de PVC (hasta 50mm)', unit:'ml', price:35.00 },
-  { category:'Baños y Fontanería', concept:'Sustitución de bajante comunitaria', unit:'ml', price:120.00 },
-  { category:'Baños y Fontanería', concept:'Mampara de ducha (instalación)', unit:'ud', price:110.00 },
-  { category:'Baños y Fontanería', concept:'Bidet (suministro e instalación)', unit:'ud', price:180.00 },
-  { category:'Baños y Fontanería', concept:'Instalación de termo eléctrico 80L', unit:'ud', price:240.00 },
-  { category:'Baños y Fontanería', concept:'Llave de escuadra (cambio)', unit:'ud', price:20.00 },
-  { category:'Baños y Fontanería', concept:'Bote sifónico (colocación)', unit:'ud', price:65.00 },
-  { category:'Baños y Fontanería', concept:'Radiador toallero (conexión)', unit:'ud', price:95.00 },
-  { category:'Baños y Fontanería', concept:'Tratamiento de silicona en sanitarios', unit:'m', price:12.00 },
-  { category:'Baños y Fontanería', concept:'Grupo de presión para vivienda', unit:'ud', price:450.00 },
-  { category:'Baños y Fontanería', concept:'Fregadero de cocina (montaje)', unit:'ud', price:75.00 },
-  { category:'Baños y Fontanería', concept:'Ducha higiénica junto inodoro', unit:'ud', price:130.00 },
-  // Suelos y Pavimentos
-  { category:'Suelos y Pavimentos', concept:'Laminado AC5 (incluye manta)', unit:'m2', price:32.00 },
-  { category:'Suelos y Pavimentos', concept:'Suelo porcelánico (mano de obra)', unit:'m2', price:28.00 },
-  { category:'Suelos y Pavimentos', concept:'Rodapié de madera lacado blanco', unit:'ml', price:10.50 },
-  { category:'Suelos y Pavimentos', concept:'Rodapié cerámico (mano de obra)', unit:'ml', price:8.00 },
-  { category:'Suelos y Pavimentos', concept:'Nivelación de suelo con mortero autonivelante', unit:'m2', price:14.00 },
-  { category:'Suelos y Pavimentos', concept:'Suelo de vinilo click', unit:'m2', price:38.00 },
-  { category:'Suelos y Pavimentos', concept:'Pulido y abrillantado de mármol', unit:'m2', price:18.00 },
-  { category:'Suelos y Pavimentos', concept:'Acuchillado y barnizado de parquet', unit:'m2', price:26.00 },
-  { category:'Suelos y Pavimentos', concept:'Microcemento en suelos (capas completas)', unit:'m2', price:75.00 },
-  { category:'Suelos y Pavimentos', concept:'Césped artificial (suministro e inst.)', unit:'m2', price:42.00 },
-  { category:'Suelos y Pavimentos', concept:'Tarifa de exterior de madera técnica', unit:'m2', price:85.00 },
-  { category:'Suelos y Pavimentos', concept:'Baldosa hidráulica (colocación)', unit:'m2', price:45.00 },
-  { category:'Suelos y Pavimentos', concept:'Alfombra de piedra/resina', unit:'m2', price:60.00 },
-  { category:'Suelos y Pavimentos', concept:'Perfil de transición/pletina', unit:'ml', price:9.00 },
-  { category:'Suelos y Pavimentos', concept:'Limpieza previa y desengrasado', unit:'m2', price:3.50 },
-  { category:'Suelos y Pavimentos', concept:'Moqueta ferial (colocación)', unit:'m2', price:12.00 },
-  { category:'Suelos y Pavimentos', concept:'Zócalo de acero inoxidable', unit:'ml', price:24.00 },
-  { category:'Suelos y Pavimentos', concept:'Reparación de lamas de parquet', unit:'ud', price:40.00 },
-  { category:'Suelos y Pavimentos', concept:'Frisado de peldaños (mano de obra)', unit:'ud', price:35.00 },
-  { category:'Suelos y Pavimentos', concept:'Pavimento continuo de resina PU', unit:'m2', price:55.00 },
-  // Tejados y Cubiertas
-  { category:'Tejados y Cubiertas', concept:'Limpieza de canalones', unit:'ml', price:15.00 },
-  { category:'Tejados y Cubiertas', concept:'Sustitución de teja cerámica rota', unit:'ud', price:12.00 },
-  { category:'Tejados y Cubiertas', concept:'Impermeabilización con tela asfáltica', unit:'m2', price:28.00 },
-  { category:'Tejados y Cubiertas', concept:'Cubierta de panel sándwich', unit:'m2', price:65.00 },
-  { category:'Tejados y Cubiertas', concept:'Reparación de cumbrera', unit:'ml', price:45.00 },
-  { category:'Tejados y Cubiertas', concept:'Aislamiento térmico bajo cubierta (lana roca)', unit:'m2', price:18.00 },
-  { category:'Tejados y Cubiertas', concept:'Instalación de ventana tipo Velux', unit:'ud', price:420.00 },
-  { category:'Tejados y Cubiertas', concept:'Tratamiento hidrófugo de tejas', unit:'m2', price:14.00 },
-  { category:'Tejados y Cubiertas', concept:'Bajante exterior de aluminio/PVC', unit:'ml', price:38.00 },
-  { category:'Tejados y Cubiertas', concept:'Cubierta de zinc (mano de obra)', unit:'m2', price:95.00 },
-  { category:'Tejados y Cubiertas', concept:'Repaso de encuentros con chimeneas', unit:'ud', price:120.00 },
-  { category:'Tejados y Cubiertas', concept:'Pintura clorocaucho con fibra de vidrio', unit:'m2', price:22.00 },
-  { category:'Tejados y Cubiertas', concept:'Desmontaje de amianto (empresa autorizada)', unit:'m2', price:45.00 },
-  { category:'Tejados y Cubiertas', concept:'Instalación de sombrerete de chimenea', unit:'ud', price:85.00 },
-  { category:'Tejados y Cubiertas', concept:'Canalón de zinc (instalación)', unit:'ml', price:55.00 },
-  { category:'Tejados y Cubiertas', concept:'Revestimiento de aleros', unit:'ml', price:30.00 },
-  { category:'Tejados y Cubiertas', concept:'Limpieza de bajantes con manguera', unit:'ud', price:60.00 },
-  { category:'Tejados y Cubiertas', concept:'Reparación de limahoya', unit:'ml', price:65.00 },
-  { category:'Tejados y Cubiertas', concept:'Instalación de tela de protección antipájaros', unit:'ml', price:14.00 },
-  { category:'Tejados y Cubiertas', concept:'Cubierta plana transitable (baldosín)', unit:'m2', price:55.00 },
-  // Albañilería y Tabiquería
-  { category:'Albañilería y Tabiquería', concept:'Tabique de ladrillo hueco doble (7cm)', unit:'m2', price:35.00 },
-  { category:'Albañilería y Tabiquería', concept:'Tabique de pladur simple (70/48)', unit:'m2', price:28.00 },
-  { category:'Albañilería y Tabiquería', concept:'Tabique de pladur doble placa (70/48)', unit:'m2', price:42.00 },
-  { category:'Albañilería y Tabiquería', concept:'Enfoscado de cemento en paredes', unit:'m2', price:14.00 },
-  { category:'Albañilería y Tabiquería', concept:'Guarnecido y enlucido de yeso', unit:'m2', price:12.00 },
-  { category:'Albañilería y Tabiquería', concept:'Rozas para instalaciones', unit:'ml', price:8.00 },
-  { category:'Albañilería y Tabiquería', concept:'Recibido de marcos y cercos', unit:'ud', price:25.00 },
-  { category:'Albañilería y Tabiquería', concept:'Formación de peldaños de ladrillo', unit:'ud', price:45.00 },
-  { category:'Albañilería y Tabiquería', concept:'Apertura de hueco en muro (hasta 1m)', unit:'ud', price:280.00 },
-  { category:'Albañilería y Tabiquería', concept:'Cerramiento de hueco con ladrillo', unit:'m2', price:55.00 },
-  { category:'Albañilería y Tabiquería', concept:'Falso techo de pladur (simple, pintura incl.)', unit:'m2', price:32.00 },
-  { category:'Albañilería y Tabiquería', concept:'Falso techo de escayola lisa', unit:'m2', price:22.00 },
-  { category:'Albañilería y Tabiquería', concept:'Revestimiento de piedra natural', unit:'m2', price:65.00 },
-  { category:'Albañilería y Tabiquería', concept:'Impermeabilización de terraza con lámina', unit:'m2', price:38.00 },
-  { category:'Albañilería y Tabiquería', concept:'Cata de reconocimiento en pared/suelo', unit:'ud', price:60.00 },
-  { category:'Albañilería y Tabiquería', concept:'Vierteaguas de piedra artificial', unit:'ml', price:28.00 },
-  { category:'Albañilería y Tabiquería', concept:'Sellado de juntas de dilatación', unit:'ml', price:6.00 },
-  { category:'Albañilería y Tabiquería', concept:'Regatas y tapado con mortero', unit:'ml', price:9.00 },
-  { category:'Albañilería y Tabiquería', concept:'Microcemento en paredes (capas completas)', unit:'m2', price:85.00 },
-  { category:'Albañilería y Tabiquería', concept:'Trasdosado autoportante en medianera', unit:'m2', price:36.00 },
-  // Carpintería y Puertas
-  { category:'Carpintería y Puertas', concept:'Puerta de paso interior (block + montaje)', unit:'ud', price:180.00 },
-  { category:'Carpintería y Puertas', concept:'Puerta blindada de seguridad (montaje)', unit:'ud', price:350.00 },
-  { category:'Carpintería y Puertas', concept:'Ventana de aluminio corredera (montaje)', unit:'ud', price:280.00 },
-  { category:'Carpintería y Puertas', concept:'Persiana de aluminio lama 40 (motorizable)', unit:'m2', price:95.00 },
-  { category:'Carpintería y Puertas', concept:'Armario empotrado puertas correderas', unit:'m2', price:220.00 },
-  { category:'Carpintería y Puertas', concept:'Puerta corredera de madera (obra)', unit:'ud', price:320.00 },
-  { category:'Carpintería y Puertas', concept:'Barandilla de madera maciza (montaje)', unit:'ml', price:85.00 },
-  { category:'Carpintería y Puertas', concept:'Mosquitera enrollable (montaje)', unit:'ud', price:95.00 },
-  { category:'Carpintería y Puertas', concept:'Cerradura de seguridad (cambio)', unit:'ud', price:65.00 },
-  { category:'Carpintería y Puertas', concept:'Zócalo de madera DM (colocación)', unit:'ml', price:8.00 },
-  { category:'Carpintería y Puertas', concept:'Puerta de garaje seccional (montaje)', unit:'ud', price:1200.00 },
-  { category:'Carpintería y Puertas', concept:'Montaje de muebles de cocina (IKEA/equiv.)', unit:'ud', price:35.00 },
-  { category:'Carpintería y Puertas', concept:'Encimera de silestone (colocación/ml)', unit:'ml', price:65.00 },
-  { category:'Carpintería y Puertas', concept:'Ventana de PVC doble acristalamiento', unit:'ud', price:320.00 },
-  { category:'Carpintería y Puertas', concept:'Puerta de aluminio exterior (montaje)', unit:'ud', price:450.00 },
-  // Demolición y Desescombro
-  { category:'Demolición y Desescombro', concept:'Demolición de tabique de ladrillo', unit:'m2', price:18.00 },
-  { category:'Demolición y Desescombro', concept:'Demolición de solado con medios manuales', unit:'m2', price:12.00 },
-  { category:'Demolición y Desescombro', concept:'Levantado de alicatado', unit:'m2', price:10.00 },
-  { category:'Demolición y Desescombro', concept:'Retirada y gestión de escombros', unit:'m3', price:45.00 },
-  { category:'Demolición y Desescombro', concept:'Alquiler de contenedor de escombros', unit:'ud', price:180.00 },
-  { category:'Demolición y Desescombro', concept:'Demolición de falso techo', unit:'m2', price:8.00 },
-  { category:'Demolición y Desescombro', concept:'Desmontaje completo de cocina', unit:'global', price:150.00 },
-  { category:'Demolición y Desescombro', concept:'Corte con radial en solado', unit:'ml', price:5.00 },
-  { category:'Demolición y Desescombro', concept:'Desmontaje de escalera de madera', unit:'global', price:220.00 },
-  { category:'Demolición y Desescombro', concept:'Levantado de carpintería exterior', unit:'ud', price:35.00 },
-  { category:'Demolición y Desescombro', concept:'Limpieza final de obra', unit:'global', price:250.00 },
-  // Climatización y Ventilación
-  { category:'Climatización y Ventilación', concept:'Aire acondicionado split 1x1 2500W (inst.)', unit:'ud', price:380.00 },
-  { category:'Climatización y Ventilación', concept:'Aire acondicionado 2x1 (inst.)', unit:'ud', price:650.00 },
-  { category:'Climatización y Ventilación', concept:'Aire acondicionado 3x1 (inst.)', unit:'ud', price:950.00 },
-  { category:'Climatización y Ventilación', concept:'Ventilación mecánica controlada (VMC)', unit:'ud', price:420.00 },
-  { category:'Climatización y Ventilación', concept:'Bomba de calor aerotérmica (inst.)', unit:'ud', price:2800.00 },
-  { category:'Climatización y Ventilación', concept:'Rejilla de ventilación (instalación)', unit:'ud', price:35.00 },
-  { category:'Climatización y Ventilación', concept:'Tubo de cobre para climatización', unit:'ml', price:22.00 },
-  { category:'Climatización y Ventilación', concept:'Aislamiento térmico de tuberías', unit:'ml', price:8.00 },
-  { category:'Climatización y Ventilación', concept:'Termostato digital programable (inst.)', unit:'ud', price:85.00 },
-  { category:'Climatización y Ventilación', concept:'Caldera de gas de condensación', unit:'ud', price:1800.00 },
-  { category:'Climatización y Ventilación', concept:'Radiador de aluminio 10 elementos', unit:'ud', price:120.00 },
-  { category:'Climatización y Ventilación', concept:'Suelo radiante (mano de obra, sin material)', unit:'m2', price:18.00 },
-  // Azulejos y Alicatado
-  { category:'Azulejos y Alicatado', concept:'Alicatado de baño (mano de obra)', unit:'m2', price:22.00 },
-  { category:'Azulejos y Alicatado', concept:'Alicatado de cocina (mano de obra)', unit:'m2', price:20.00 },
-  { category:'Azulejos y Alicatado', concept:'Gresite de piscina (colocación)', unit:'m2', price:55.00 },
-  { category:'Azulejos y Alicatado', concept:'Rejuntado de azulejos/suelo', unit:'m2', price:8.00 },
-  { category:'Azulejos y Alicatado', concept:'Cortado y colocación de piezas especiales', unit:'ud', price:3.50 },
-  { category:'Azulejos y Alicatado', concept:'Mosaico de pasta de vidrio (colocación)', unit:'m2', price:35.00 },
-  { category:'Azulejos y Alicatado', concept:'Baldosa rectificada gran formato (colocación)', unit:'m2', price:32.00 },
-  { category:'Azulejos y Alicatado', concept:'Franja o cenefa decorativa', unit:'ml', price:12.00 },
-  { category:'Azulejos y Alicatado', concept:'Plaqueta de ladrillo visto (fachada)', unit:'m2', price:48.00 },
-  { category:'Azulejos y Alicatado', concept:'Despiece especial en diagonal', unit:'m2', price:28.00 },
-  { category:'Azulejos y Alicatado', concept:'Preparación de superficie y tendido de cola', unit:'m2', price:6.00 },
-];
-
-const CATALOG_SEED_CATEGORIES = [
-  'Pintura y Decoración','Electricidad e Iluminación','Baños y Fontanería',
-  'Suelos y Pavimentos','Tejados y Cubiertas','Albañilería y Tabiquería',
-  'Carpintería y Puertas','Demolición y Desescombro','Climatización y Ventilación',
-  'Azulejos y Alicatado',
-];
-const CATALOG_SEED_UNITS = ['m2','ml','ud','m3','m','global','kg','litros'];
 
 const App = () => {
   // --- AUTH STATE ---
-  const [user, setUser] = useState<FirebaseUser | null>(null);
-  const [authReady, setAuthReady] = useState(false);
+  const { user, authReady, handleLogin, handleLogout } = useAuth();
 
   // --- STATE ---
   const [activeTab, setActiveTab] = useState('dashboard'); 
@@ -444,11 +69,10 @@ const App = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isManagingLists, setIsManagingLists] = useState(false);
 
+  const { categories, units, companyInfo, expenseCategories, saveNewCategory: saveNewCategoryFor, saveNewUnit: saveNewUnitFor } = useSettings(user);
+
   const [projects, setProjects] = useState<Project[]>([]);
-  const [catalog, setCatalog] = useState<CatalogItem[]>([]);
-  const [categories, setCategories] = useState<string[]>(['Pintura', 'Escayola', 'Suelos', 'Baños', 'Cocinas', 'Fontanería', 'Electricidad']);
-  const [units, setUnits] = useState<string[]>(['m2', 'ml', 'ud', 'litros', 'm3', 'kg']);
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const { events, saveEvent, handleDragOver, handleDrop } = useCalendarEvents(user);
   const [budgets, setBudgets] = useState<Record<number | string, BudgetItem[]>>({});
   const [invoices, setInvoices] = useState<Record<number | string, BudgetItem[]>>({});
   const [expenses, setExpenses] = useState<Record<number | string, ExpenseItem[]>>({});
@@ -462,9 +86,6 @@ const App = () => {
   const [tempCategory, setTempCategory] = useState('');
   const [tempUnit, setTempUnit] = useState('');
   const [isInvoiceVisible, setIsInvoiceVisible] = useState(false);
-  const [isScanningCatalog, setIsScanningCatalog] = useState(false);
-  const [catalogScanError, setCatalogScanError] = useState<string | null>(null);
-  const [scannedCatalogPreview, setScannedCatalogPreview] = useState<Array<{concept:string;category:string;unit:string;price:number}> | null>(null);
   const [editingCatName, setEditingCatName] = useState<{old:string;val:string}|null>(null);
   const [editingUnitName, setEditingUnitName] = useState<{old:string;val:string}|null>(null);
   const [editingInvoiceItem, setEditingInvoiceItem] = useState<BudgetItem | null>(null);
@@ -472,48 +93,26 @@ const App = () => {
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ id: any; type: string; label: string } | null>(null);
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
   const [isSeedingCatalog, setIsSeedingCatalog] = useState(false);
-  const [isConfirmingCatalog, setIsConfirmingCatalog] = useState(false);
-  const [companyInfo, setCompanyInfo] = useState<CompanyInfo>(DEFAULT_COMPANY);
-  const [expenseCategories, setExpenseCategories] = useState<string[]>(DEFAULT_EXPENSE_CATEGORIES);
   const [isEditingCompany, setIsEditingCompany] = useState(false);
   const [companyDraft, setCompanyDraft] = useState<CompanyInfo>(DEFAULT_COMPANY);
 
+  const {
+    catalog,
+    isScanningCatalog,
+    catalogScanError,
+    setCatalogScanError,
+    scannedCatalogPreview,
+    setScannedCatalogPreview,
+    isConfirmingCatalog,
+    handleAddCatalogItem,
+    handleUpdateCatalogItem: handleUpdateCatalogItemFor,
+    handleCatalogScan,
+    handleConfirmScannedCatalog,
+  } = useCatalog(user, categories, units);
+
   // --- PERSISTENCE ---
   useEffect(() => {
-    if (!isFirebaseConfigured || !auth) {
-      setAuthReady(true); // Still ready to show "Not Configured" state
-      return;
-    }
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setAuthReady(true);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
     if (!user || !isFirebaseConfigured || !db) return;
-
-    const pathSettings = 'settings/global';
-    // Load Global Settings
-    const settingsUnsubscribe = onSnapshot(doc(db, 'settings', 'global'), (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.data();
-        if (data.categories) setCategories(data.categories);
-        if (data.units) setUnits(data.units);
-        if (data.companyInfo) setCompanyInfo(data.companyInfo);
-        if (data.expenseCategories) setExpenseCategories(data.expenseCategories);
-      }
-    }, (error) => handleFirestoreError(error, OperationType.GET, pathSettings));
-
-    const pathCatalog = 'catalog';
-    // Load Catalog
-    const catalogUnsubscribe = onSnapshot(collection(db, 'catalog'), (snapshot) => {
-      setCatalog(snapshot.docs.map(doc => {
-        const data = doc.data();
-        return { ...data, firebaseId: doc.id, id: data.id || doc.id } as CatalogItem;
-      }));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, pathCatalog));
 
     const pathProjects = 'projects';
     // Load Projects
@@ -526,17 +125,8 @@ const App = () => {
       }
     }, (error) => handleFirestoreError(error, OperationType.LIST, pathProjects));
 
-    const pathCalendar = 'calendar_events';
-    // Load Calendar Events
-    const eventsUnsubscribe = onSnapshot(collection(db, 'calendar_events'), (snapshot) => {
-      setEvents(snapshot.docs.map(doc => ({ ...doc.data(), firebaseId: doc.id } as CalendarEvent)));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, pathCalendar));
-
     return () => {
-      settingsUnsubscribe();
-      catalogUnsubscribe();
       projectsUnsubscribe();
-      eventsUnsubscribe();
     };
   }, [user]);
 
@@ -584,23 +174,6 @@ const App = () => {
       expenseUnsubscribe();
     };
   }, [user, selectedProjectId, projects]);
-
-  const handleLogin = async () => {
-    if (!isFirebaseConfigured || !auth || !googleProvider) {
-      alert("Configuración de Firebase no detectada. Por favor, completa el proceso de configuración en el chat.");
-      return;
-    }
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error: any) {
-      console.error("Login failed:", error);
-      alert("Error al entrar: " + (error.message || "Error desconocido"));
-    }
-  };
-
-  const handleLogout = () => {
-    if (auth) signOut(auth);
-  };
 
   // --- HANDLERS ---
   const handleGenerateInvoice = async () => {
@@ -731,39 +304,9 @@ const App = () => {
       status: formData.get('status') as 'pendiente' | 'urgente'
     };
 
-    try {
-      if (editingEvent?.firebaseId) {
-        await updateDoc(doc(db, 'calendar_events', editingEvent.firebaseId), eventData);
-      } else {
-        await addDoc(collection(db, 'calendar_events'), eventData);
-      }
-      setEditingEvent(null);
-      setAddingEventDate(null);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'calendar_events');
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  };
-
-  const handleDrop = async (e: React.DragEvent, date: string) => {
-    e.preventDefault();
-    const eventFirebaseId = e.dataTransfer.getData('text/plain');
-    if (!eventFirebaseId) return;
-
-    const oldDate = events.find(ev => ev.firebaseId === eventFirebaseId)?.date;
-    setEvents(prev => prev.map(ev => ev.firebaseId === eventFirebaseId ? { ...ev, date } : ev));
-    try {
-      await updateDoc(doc(db, 'calendar_events', eventFirebaseId), { date });
-    } catch (error) {
-      if (oldDate !== undefined) {
-        setEvents(prev => prev.map(ev => ev.firebaseId === eventFirebaseId ? { ...ev, date: oldDate } : ev));
-      }
-      handleFirestoreError(error, OperationType.UPDATE, `calendar_events/${eventFirebaseId}`);
-    }
+    await saveEvent(eventData, editingEvent?.firebaseId);
+    setEditingEvent(null);
+    setAddingEventDate(null);
   };
 
   const handleAddBudgetItem = async (catalogItemId: string, qty: number) => {
@@ -845,85 +388,8 @@ const App = () => {
   };
 
   const handleUpdateCatalogItem = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!editingCatalogItem || !editingCatalogItem.firebaseId) return;
-    const formData = new FormData(e.currentTarget);
-    const concept = formData.get('concept') as string;
-    const unit = formData.get('unit') as string;
-    const price = parseFloat(formData.get('price') as string) || 0;
-
-    try {
-      await updateDoc(doc(db, 'catalog', editingCatalogItem.firebaseId), {
-        concept,
-        unit,
-        price
-      });
-      setEditingCatalogItem(null);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `catalog/${editingCatalogItem.firebaseId}`);
-    }
-  };
-
-  const handleAddCatalogItem = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!isFirebaseConfigured) return;
-    const form = e.currentTarget;
-    const formData = new FormData(form);
-    const newItem = {
-      category: formData.get('category') as string,
-      concept: formData.get('concept') as string,
-      unit: formData.get('unit') as string,
-      price: parseFloat(formData.get('price') as string) || 0,
-      id: Date.now()
-    };
-    try {
-      await addDoc(collection(db, 'catalog'), newItem);
-      form.reset();
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, 'catalog');
-    }
-  };
-
-  const handleCatalogScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = '';
-    setIsScanningCatalog(true);
-    setCatalogScanError(null);
-    try {
-      const items = await scanDocument(file, ScanType.CATALOG);
-      setScannedCatalogPreview(items.map((i: any) => ({
-        concept: i.concept || '',
-        category: i.category || categories[0] || '',
-        unit: i.unit || units[0] || '',
-        price: Number(i.price) || 0
-      })));
-    } catch (error) {
-      console.error("Catalog Scan Error:", error);
-      const msg = error instanceof Error ? error.message : String(error);
-      if (msg.includes('429') || msg.toLowerCase().includes('quota')) {
-        setCatalogScanError("Cuota de IA agotada. Has superado el límite gratuito de Gemini. Espera un momento o revisa tu plan en ai.google.dev.");
-      } else {
-        setCatalogScanError("Error al escanear. Verifica que el archivo sea una imagen o PDF legible.");
-      }
-    } finally {
-      setIsScanningCatalog(false);
-    }
-  };
-
-  const handleConfirmScannedCatalog = async () => {
-    if (!scannedCatalogPreview) return;
-    setIsConfirmingCatalog(true);
-    try {
-      for (const item of scannedCatalogPreview) {
-        await addDoc(collection(db, 'catalog'), { ...item, id: Date.now() + Math.random() });
-      }
-      setScannedCatalogPreview(null);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, 'catalog');
-    } finally {
-      setIsConfirmingCatalog(false);
-    }
+    await handleUpdateCatalogItemFor(editingCatalogItem, e);
+    setEditingCatalogItem(null);
   };
 
   const handleSeedCatalog = async () => {
@@ -1010,39 +476,15 @@ const App = () => {
     }
   };
   const saveNewCategory = async () => {
-    if (!isFirebaseConfigured || !db) return;
-    const trimmed = tempCategory.trim();
-    if (trimmed && !categories.includes(trimmed)) {
-      const newCats = [...categories, trimmed];
-      try {
-        await setDoc(doc(db, 'settings', 'global'), { 
-          categories: newCats,
-          units: units.length > 0 ? units : ['m2', 'ml', 'ud', 'litros', 'm3', 'kg']
-        }, { merge: true });
-        setTempCategory('');
-        setIsAddingCategory(false);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, 'settings/global');
-      }
-    }
+    await saveNewCategoryFor(tempCategory);
+    setTempCategory('');
+    setIsAddingCategory(false);
   };
 
   const saveNewUnit = async () => {
-    if (!isFirebaseConfigured || !db) return;
-    const trimmed = tempUnit.trim();
-    if (trimmed && !units.includes(trimmed)) {
-      const newUnits = [...units, trimmed];
-      try {
-        await setDoc(doc(db, 'settings', 'global'), { 
-          categories: categories.length > 0 ? categories : ['Pintura', 'Escayola', 'Suelos', 'Baños', 'Cocinas', 'Fontanería', 'Electricidad'],
-          units: newUnits 
-        }, { merge: true });
-        setTempUnit('');
-        setIsAddingUnit(false);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, 'settings/global');
-      }
-    }
+    await saveNewUnitFor(tempUnit);
+    setTempUnit('');
+    setIsAddingUnit(false);
   };
 
   const handleUpdateProjectStatus = async (projectId: string | number, status: 'En curso' | 'Pendiente' | 'Finalizado') => {
