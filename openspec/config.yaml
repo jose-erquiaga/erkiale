@@ -1,0 +1,25 @@
+schema: spec-driven
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+context: |
+  ReformasPro (Erkiale): SPA de gestión de proyectos de reformas.
+  Tech stack: React 19 + TypeScript, Vite 6, Tailwind CSS 4, Framer Motion (motion/react).
+  Backend: Firebase (Auth con Google, Firestore) — sin servidor propio, todo desde el cliente.
+  IA: Gemini (@google/genai) vía src/services/geminiService.ts para escaneo de documentos (catálogo/facturas).
+  Estructura actual: casi todo el código vive en src/App.tsx (componente monolítico ~3000 líneas:
+  estado, listeners de Firestore, handlers CRUD, y JSX de todas las vistas — dashboard, proyectos,
+  presupuestos, calendario, facturación, gastos, catálogo).
+  Convenciones: español para textos de UI y mensajes de usuario; inglés para nombres de variables/tipos.
+  Dominio: proyectos de reforma con presupuestos (budget_items), facturas (invoice_items),
+  gastos (expense_items), catálogo de precios (catalog) y calendario de tareas (calendar_events).
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
