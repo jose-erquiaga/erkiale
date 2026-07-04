@@ -71,7 +71,7 @@ export function useProjectSubcollections(user: unknown, selectedProjectId: strin
     };
   }, [user, selectedProjectId, projects]);
 
-  const handleAddBudgetItemFromCatalog = async (catalogItem: HierarchicalCatalogItem, qty: number, guildName?: string, roomName?: string) => {
+  const handleAddBudgetItemFromCatalog = async (catalogItem: HierarchicalCatalogItem, qty: number, guildName?: string, roomName?: string, subcategoryName?: string) => {
     const newItem = {
       id: Date.now(),
       concept: catalogItem.description,
@@ -82,8 +82,10 @@ export function useProjectSubcollections(user: unknown, selectedProjectId: strin
       tipo: catalogItem.type,
       guildId: catalogItem.guildId,
       roomId: catalogItem.roomId,
+      subcategoryId: catalogItem.subcategoryId,
       ...(guildName ? { guildName } : {}),
       ...(roomName ? { roomName } : {}),
+      ...(subcategoryName ? { subcategoryName } : {}),
     };
 
     try {
@@ -95,7 +97,7 @@ export function useProjectSubcollections(user: unknown, selectedProjectId: strin
     }
   };
 
-  const handleAddAdHocBudgetItem = async (data: { concept: string; qty: number; unit: string; price: number; tipo: 'tareas' | 'material'; guildId?: string; guildName?: string; roomId?: string; roomName?: string }) => {
+  const handleAddAdHocBudgetItem = async (data: { concept: string; qty: number; unit: string; price: number; tipo: 'tareas' | 'material'; guildId?: string; guildName?: string; roomId?: string; roomName?: string; subcategoryId?: string; subcategoryName?: string }) => {
     const newItem = {
       id: Date.now(),
       concept: data.concept,
@@ -108,6 +110,8 @@ export function useProjectSubcollections(user: unknown, selectedProjectId: strin
       ...(data.guildName ? { guildName: data.guildName } : {}),
       ...(data.roomId ? { roomId: data.roomId } : {}),
       ...(data.roomName ? { roomName: data.roomName } : {}),
+      ...(data.subcategoryId ? { subcategoryId: data.subcategoryId } : {}),
+      ...(data.subcategoryName ? { subcategoryName: data.subcategoryName } : {}),
     };
 
     try {
@@ -173,6 +177,8 @@ export function useProjectSubcollections(user: unknown, selectedProjectId: strin
           ...(item.guildName ? { guildName: item.guildName } : {}),
           ...(item.roomId ? { roomId: item.roomId } : {}),
           ...(item.roomName ? { roomName: item.roomName } : {}),
+          ...(item.subcategoryId ? { subcategoryId: item.subcategoryId } : {}),
+          ...(item.subcategoryName ? { subcategoryName: item.subcategoryName } : {}),
         });
       }
       return true;

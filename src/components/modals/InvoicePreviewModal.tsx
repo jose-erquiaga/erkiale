@@ -183,19 +183,26 @@ export const InvoicePreviewModal = ({
                                 <tr>
                                   <td colSpan={5} className="pb-1 pl-4 text-[9px] font-bold text-slate-400 uppercase tracking-widest">{r.roomName}</td>
                                 </tr>
-                                {r.items.map(item => (
-                                  <tr key={item.id} className="border-b border-slate-100">
-                                    <td className="py-4 pr-4 pl-4">
-                                      <p className="font-bold text-slate-900 uppercase">{item.concept}</p>
-                                      {item.description && (
-                                        <p className="text-[10px] text-slate-600 mt-1 leading-snug whitespace-pre-line">{item.description}</p>
-                                      )}
-                                    </td>
-                                    <td className="py-4 text-right text-slate-700">{item.qty.toFixed(2)}</td>
-                                    <td className="py-4 text-right text-slate-700">{item.price.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
-                                    <td className="py-4 text-right text-slate-700">21%</td>
-                                    <td className="py-4 text-right font-bold text-slate-900">{(item.price * item.qty * 1.21).toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
-                                  </tr>
+                                {r.subcategories.map(s => (
+                                  <React.Fragment key={s.subcategoryName}>
+                                    <tr>
+                                      <td colSpan={5} className="pb-1 pl-6 text-[8px] font-bold text-slate-300 uppercase tracking-widest">{s.subcategoryName}</td>
+                                    </tr>
+                                    {s.items.map(item => (
+                                      <tr key={item.id} className="border-b border-slate-100">
+                                        <td className="py-4 pr-4 pl-6">
+                                          <p className="font-bold text-slate-900 uppercase">{item.concept}</p>
+                                          {item.description && (
+                                            <p className="text-[10px] text-slate-600 mt-1 leading-snug whitespace-pre-line">{item.description}</p>
+                                          )}
+                                        </td>
+                                        <td className="py-4 text-right text-slate-700">{item.qty.toFixed(2)}</td>
+                                        <td className="py-4 text-right text-slate-700">{item.price.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
+                                        <td className="py-4 text-right text-slate-700">21%</td>
+                                        <td className="py-4 text-right font-bold text-slate-900">{(item.price * item.qty * 1.21).toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
+                                      </tr>
+                                    ))}
+                                  </React.Fragment>
                                 ))}
                               </React.Fragment>
                             ))}
