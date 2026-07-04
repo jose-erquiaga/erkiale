@@ -55,11 +55,11 @@ function BudgetItemRows({ items, setEditingBudgetItem, setDeleteConfirmation }: 
             <td className="p-6">
               <span className="text-[9px] font-medium text-slate-900">{item.concept}</span>
             </td>
-            <td className="p-6 text-sm text-slate-600 font-bold text-center">
+            <td className="p-6 text-sm text-slate-600 font-medium text-center">
               <span className="bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">{item.qty} {item.unit}</span>
             </td>
             <td className="p-6 text-sm text-slate-500 font-medium text-right">{item.price.toFixed(2)}€</td>
-            <td className="p-6 text-sm font-black text-slate-900 text-right">{item.total.toFixed(2)}€</td>
+            <td className="p-6 text-sm text-slate-900 text-right">{item.total.toFixed(2)}€</td>
             <td className="p-6 text-right">
                 <div className="flex justify-end gap-2">
                   <button

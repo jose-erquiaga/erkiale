@@ -204,7 +204,7 @@ export const InvoicePreviewModal = ({
                                         <td className="py-4 text-right text-slate-700">{item.qty.toFixed(2)}</td>
                                         <td className="py-4 text-right text-slate-700">{item.price.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
                                         <td className="py-4 text-right text-slate-700">21%</td>
-                                        <td className="py-4 text-right font-bold text-slate-900">{(item.price * item.qty * 1.21).toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
+                                        <td className="py-4 text-right text-slate-900">{(item.price * item.qty * 1.21).toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</td>
                                       </tr>
                                     ))}
                                   </React.Fragment>
