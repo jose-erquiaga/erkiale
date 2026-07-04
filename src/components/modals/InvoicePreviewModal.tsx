@@ -170,7 +170,7 @@ export const InvoicePreviewModal = ({
                       <React.Fragment key={group}>
                         <tr>
                           <td colSpan={5} className="pt-4 pb-1 text-[12px] font-black text-slate-600 uppercase tracking-widest">
-                            {group === 'material' ? 'Material' : 'Tareas a realizar'}
+                            {group === 'material' ? 'Material' : (isInvoice ? 'Tareas realizadas' : 'Tareas a realizar')}
                           </td>
                         </tr>
                         {guildGroups.map(g => (
