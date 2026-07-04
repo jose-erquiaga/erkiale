@@ -51,13 +51,23 @@ export const ExpensesView = ({
           <div className="px-8 py-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
             <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest">Gastos Registrados</h4>
             <div className="flex gap-2">
-              <label className={`flex items-center gap-2 text-[10px] font-black cursor-pointer px-4 py-2 rounded-xl transition-all uppercase tracking-widest border border-blue-100 ${isScanningExpense ? 'bg-blue-100' : 'bg-blue-50 text-blue-600'}`}>
-                {isScanningExpense ? "Procesando..." : <><Camera size={14} /> Scanner IA / Foto</>}
+              <label className={`flex items-center gap-2 text-[10px] font-black cursor-pointer px-5 py-3 rounded-xl transition-all uppercase tracking-widest shadow-lg shadow-blue-100 ${isScanningExpense ? 'bg-blue-300 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
+                {isScanningExpense ? "Procesando..." : <><Camera size={16} /> Tomar Foto</>}
+                <input
+                  type="file"
+                  className="hidden"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleExpenseScan}
+                  disabled={isScanningExpense}
+                />
+              </label>
+              <label className={`flex items-center gap-2 text-[10px] font-black cursor-pointer px-4 py-3 rounded-xl transition-all uppercase tracking-widest border border-blue-100 ${isScanningExpense ? 'bg-blue-100' : 'bg-blue-50 text-blue-600'}`}>
+                Subir Archivo
                 <input
                   type="file"
                   className="hidden"
                   accept="image/*,application/pdf"
-                  capture="environment"
                   onChange={handleExpenseScan}
                   disabled={isScanningExpense}
                 />
