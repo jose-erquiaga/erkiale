@@ -57,6 +57,7 @@ export const Sidebar = ({
       {[
         { id: 'company-expenses', label: 'Gasto Erkiale', icon: Wallet },
         { id: 'structure', label: 'Catálogo', icon: Settings },
+        { id: 'global-calendar', label: 'Calendario Global', icon: CalendarIcon },
       ].map(item => (
         <button
           key={item.id}
@@ -115,7 +116,6 @@ export const Sidebar = ({
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { id: 'projects', label: 'Proyectos', icon: Briefcase },
         { id: 'budgets', label: 'Presupuesto Activo', icon: FileText },
-        { id: 'global-calendar', label: 'Calendario Global', icon: CalendarIcon },
         { id: 'billing', label: 'Facturación', icon: Receipt },
         { id: 'expenses', label: 'Gastos', icon: Ticket },
       ].map(item => (
