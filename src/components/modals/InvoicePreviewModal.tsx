@@ -61,7 +61,10 @@ export const InvoicePreviewModal = ({
                   return Promise.resolve();
                 });
 
-                const style = pdoc.createElement('style'); style.textContent = '@page{size:A4 portrait;margin:12mm 14mm;}body{font-family:sans-serif;background:white;}'; head.appendChild(style);
+                const style = pdoc.createElement('style'); style.textContent = '@page{size:A4 portrait;margin:12mm 14mm;}body{font-family:sans-serif;background:white;}' +
+                  'tr[data-item-row]{page-break-inside:avoid;break-inside:avoid;}' +
+                  'tr[data-group-header]{page-break-after:avoid;break-after:avoid;page-break-inside:avoid;break-inside:avoid;}';
+                head.appendChild(style);
                 pdoc.body.appendChild(content.cloneNode(true));
 
                 Promise.all(stylesheetsLoaded).then(() => {
@@ -185,14 +188,14 @@ export const InvoicePreviewModal = ({
                     const guildGroups = groupItemsByGuildAndRoom(groupItems);
                     return (
                       <React.Fragment key={group}>
-                        <tr>
+                        <tr data-group-header="true">
                           <td colSpan={5} className="pt-4 pb-1 text-[12px] font-black text-slate-600 uppercase tracking-widest">
                             {group === 'material' ? 'Material' : (isInvoice ? 'Tareas realizadas' : 'Tareas a realizar')}
                           </td>
                         </tr>
                         {guildGroups.map(g => (
                           <React.Fragment key={g.guildName}>
-                            <tr>
+                            <tr data-group-header="true">
                               <td colSpan={5} className="pt-2 pb-1 pl-2 text-[11px] font-black text-blue-600 uppercase tracking-widest">
                                 <div className="flex justify-between">
                                   <span>{g.guildName}</span>
@@ -202,16 +205,16 @@ export const InvoicePreviewModal = ({
                             </tr>
                             {g.rooms.map(r => (
                               <React.Fragment key={r.roomName}>
-                                <tr>
+                                <tr data-group-header="true">
                                   <td colSpan={5} className="pb-1 pl-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">{r.roomName}</td>
                                 </tr>
                                 {r.subcategories.map(s => (
                                   <React.Fragment key={s.subcategoryName}>
-                                    <tr>
+                                    <tr data-group-header="true">
                                       <td colSpan={5} className="pb-1 pl-6 text-[9px] font-black text-slate-500 uppercase tracking-widest">{s.subcategoryName}</td>
                                     </tr>
                                     {s.items.map(item => (
-                                      <tr key={item.id} className="border-b border-slate-100">
+                                      <tr key={item.id} className="border-b border-slate-100" data-item-row="true">
                                         <td className="py-4 pr-4 pl-6">
                                           <p className="text-[9px] font-medium text-slate-900">{item.concept}</p>
                                           {item.description && (
