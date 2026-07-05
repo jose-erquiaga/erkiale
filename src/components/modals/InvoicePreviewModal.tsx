@@ -45,12 +45,29 @@ export const InvoicePreviewModal = ({
                 const head = pdoc.head;
                 const meta = pdoc.createElement('meta'); meta.setAttribute('charset', 'UTF-8'); head.appendChild(meta);
                 const title = pdoc.createElement('title'); title.textContent = 'Erkiale'; head.appendChild(title);
-                const tw = pdoc.createElement('script'); tw.src = 'https://cdn.tailwindcss.com'; head.appendChild(tw);
+
+                // Reuse the app's own compiled stylesheets instead of an external
+                // CDN so the print output matches the on-screen preview exactly.
+                const styleNodes = document.querySelectorAll('link[rel="stylesheet"], style');
+                const stylesheetsLoaded = Array.from(styleNodes).map(node => {
+                  const clone = node.cloneNode(true) as HTMLLinkElement | HTMLStyleElement;
+                  head.appendChild(clone);
+                  if (clone.tagName === 'LINK') {
+                    return new Promise<void>(resolve => {
+                      clone.addEventListener('load', () => resolve());
+                      clone.addEventListener('error', () => resolve());
+                    });
+                  }
+                  return Promise.resolve();
+                });
+
                 const style = pdoc.createElement('style'); style.textContent = '@page{size:A4 portrait;margin:12mm 14mm;}body{font-family:sans-serif;background:white;}'; head.appendChild(style);
                 pdoc.body.appendChild(content.cloneNode(true));
-                const trigger = pdoc.createElement('script');
-                trigger.textContent = 'window.onload=function(){setTimeout(function(){window.print();},1200);};';
-                pdoc.body.appendChild(trigger);
+
+                Promise.all(stylesheetsLoaded).then(() => {
+                  pw.focus();
+                  pw.print();
+                });
               }} className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase flex items-center gap-2 shadow-lg shadow-blue-100">
                 <FileText size={14}/> Imprimir / PDF
               </button>
