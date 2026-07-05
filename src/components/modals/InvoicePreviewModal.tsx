@@ -264,6 +264,9 @@ export const InvoicePreviewModal = ({
               <div className="mb-12 text-[11px]">
                 <p className="font-semibold text-slate-700 mb-1">Métodos de pago</p>
                 <p className="text-slate-600">Transferencia bancaria al número de cuenta <span className="font-bold text-slate-900">ES38 0182 1078 8602 0152 6785</span></p>
+                {total < 1000 && (
+                  <p className="text-slate-600 mt-1">O en efectivo</p>
+                )}
               </div>
 
               {/* Footer */}
