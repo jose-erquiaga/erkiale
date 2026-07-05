@@ -14,7 +14,7 @@ interface DashboardViewProps {
 export const DashboardView = ({ projects, budgets, events, setSelectedProjectId, setActiveTab }: DashboardViewProps) => {
   const urgentEvents = events
     .filter(e => e.status === 'urgente')
-    .sort((a, b) => a.startDate.localeCompare(b.startDate))
+    .sort((a, b) => (a.startDate || '').localeCompare(b.startDate || ''))
     .slice(0, 6);
 
   const ongoingProjects = projects.filter(p => p.status === 'En curso');
