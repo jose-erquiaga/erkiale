@@ -11,6 +11,20 @@ pero **el plan Básico no incluye acceso a la API** (confirmado): la API solo es
 plan Ilimitado (20 €/mes + IVA) o durante el periodo de prueba gratuito de 30 días. Este dato
 cambia el análisis coste/complejidad que motivaba originalmente el patrón LRU de 5 huecos.
 
+Restricción de negocio añadida: el presupuesto objetivo para esta pieza es **no superar 7 €/mes**.
+Se ha investigado el mercado (Billin, BeeL.es y otros) y el patrón se repite en todos los
+proveedores: el plan barato (4,90–8 €/mes) nunca incluye acceso a API, solo panel manual; el acceso
+a API empieza en ~15–20 €/mes. Por tanto, dentro del presupuesto de 7 €/mes, **ninguna integración
+automática vía API de un proveedor SaaS de terceros es viable**. Esto obliga a considerar una
+alternativa: implementar el cumplimiento VERI*FACTU directamente en Adquierele.
+
+Investigación legal relevante: la normativa (RD 1007/2023, RRSIF) **no exige una certificación
+externa de la AEAT** para el software de facturación. El cumplimiento se acredita mediante una
+**declaración responsable** que emite el propio productor del software — si Adquierele es
+desarrollado internamente, es el propio equipo quien emite esa declaración, no un tercero. No hay
+listado oficial de "apps certificadas"; cualquier desarrollador puede adaptar su software a los
+requisitos técnicos y autodeclarar cumplimiento.
+
 ## Goals / Non-Goals
 
 **Goals:**
@@ -30,8 +44,42 @@ cambia el análisis coste/complejidad que motivaba originalmente el patrón LRU 
   potencialmente incorporando los datos devueltos por Billin (número oficial, QR) una vez conocido
   el formato exacto de respuesta de la API.
 
+## Alternative Paths Considered
+
+Dos caminos posibles para cumplir con Veri-Factu, evaluados frente a la restricción de ≤7 €/mes:
+
+### A. Integrar con un proveedor SaaS (Billin u otro) vía su API
+- Coste real: ~15–20 €/mes (ningún proveedor da API por debajo de eso).
+- Ventaja: el proveedor asume el rol de motor homologado; menos superficie propia que mantener.
+- Desventaja: incumple la restricción de presupuesto (≤7 €/mes); añade dependencia y complejidad
+  extra (patrón LRU) solo para encajar en un plan barato que de todas formas no da API.
+
+### B. Implementar VERI*FACTU directamente en Adquierele (recomendado)
+- Coste recurrente: 0 € de proveedor externo (solo el desarrollo, de una sola vez).
+- Legalmente viable: no existe certificación externa de la AEAT; el cumplimiento se acredita con una
+  **declaración responsable** emitida por el propio productor del software (Adquierele/su equipo).
+- Requiere implementar correctamente: registro de facturación encadenado (hash del registro
+  anterior + UUID), firma electrónica de cada registro, código QR en la factura, registro de
+  eventos inmutable, y elegir modalidad:
+  - **VERI*FACTU**: se envía cada registro a la AEAT en tiempo real vía su API pública.
+  - **No-VERI*FACTU**: se mantiene la cadena de hashes localmente, sin envío inmediato, lista para
+    exhibir ante una inspección.
+- Riesgo principal: es responsabilidad propia que la implementación sea técnicamente correcta (un
+  fallo en el encadenado de hashes o en el registro de eventos invalidaría la autodeclaración). Se
+  recomienda validar el diseño técnico con una asesoría fiscal familiarizada con el RRSIF antes de
+  declarar el sistema operativo.
+
+**Decisión**: dado que (1) el presupuesto de 7 €/mes descarta cualquier SaaS con API, y (2) el
+archivo local de facturas ya estaba planeado en este change como fuente de verdad propia, se adopta
+la **Opción B** como dirección preferente. La integración con Billin (secciones LRU/API de este
+documento) queda como referencia/alternativa descartada, no como plan activo, salvo que la Opción B
+resulte inviable en la validación técnica/legal.
+
 ## Decisions
 
+- **Opción B (auto-implementación VERI*FACTU) es la dirección preferente** — ver sección anterior.
+  Las siguientes decisiones sobre integración con Billin quedan documentadas como diseño alternativo
+  descartado por presupuesto, no como plan activo.
 - **API directa desde backend, no MCP**: la lógica de qué cliente crear/borrar y cuándo subir una
   factura es determinista (reglas de negocio: 1 factura generada → 1 llamada a Billin), no requiere
   que un LLM decida nada en tiempo real. Se implementará como Firebase Functions invocadas tras
@@ -82,13 +130,19 @@ desbloquee, el plan previsto (a validar en su momento) sería:
 
 ## Open Questions
 
-- ¿El plan a contratar será Ilimitado (con API) desde el principio, o se seguirá evaluando el plan
-  Básico y otra vía para generar el número oficial/Veri-Factu? — **Resuelto parcialmente**: el
-  Básico no incluye API, así que si se quiere integración automática hace falta Ilimitado.
-- ¿Al borrar un cliente por API en Billin, sus facturas ya emitidas siguen siendo consultables en el
-  panel de Billin? (pendiente de confirmar con soporte de Billin)
-- ¿La API de Billin soporta CRUD completo de clientes (no solo creación de facturas)? (pendiente de
-  revisar en `api.billin.net/docs`)
-- ¿Qué formato exacto devuelve la API para el número de factura y los datos Veri-Factu (hash/QR
-  listos para un PDF propio, o solo el PDF generado por Billin)? (pendiente de confirmar en la
-  documentación técnica)
+- ¿Validar con una asesoría fiscal/gestoría familiarizada con el RRSIF el diseño técnico de la
+  Opción B (encadenado de hashes, formato de registro, QR, modalidad VERI*FACTU vs no-VERI*FACTU)
+  antes de darla por operativa? (pendiente — recomendado antes de implementar, dado que la
+  autodeclaración de cumplimiento es responsabilidad propia)
+- ¿Modalidad VERI*FACTU (envío en tiempo real a la AEAT) o no-VERI*FACTU (cadena local sin envío
+  inmediato)? Con volumen bajo (5 clientes), ambas son viables; a decidir según preferencia de
+  exposición/simplicidad.
+- Preguntas ya resueltas sobre la vía alternativa (integración Billin, descartada por presupuesto,
+  documentadas por si se retoma en el futuro):
+  - El plan Básico de Billin no incluye API (confirmado); haría falta el plan Ilimitado (20 €/mes).
+  - ¿Al borrar un cliente por API en Billin, sus facturas ya emitidas siguen siendo consultables en
+    el panel de Billin? (sin confirmar — no aplica mientras se mantenga la Opción B)
+  - ¿La API de Billin soporta CRUD completo de clientes? (sin confirmar — no aplica mientras se
+    mantenga la Opción B)
+  - ¿Formato exacto de respuesta de la API de Billin para numeración/Veri-Factu? (sin confirmar —
+    no aplica mientras se mantenga la Opción B)

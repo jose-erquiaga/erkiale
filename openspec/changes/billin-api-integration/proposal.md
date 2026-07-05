@@ -1,45 +1,54 @@
 ## Why
 
-Hoy, cuando se genera una factura en Adquierele (ERKIALE) desde una obra, los datos del cliente y
-de la factura se introducen manualmente en Billin (TeamSystem Facturas Billin) para obtener el
-número de factura oficial y el reporte fiscal Veri-Factu/TicketBAI. Con integración directa vía
-API, Adquierele podría crear/actualizar clientes y enviar facturas a Billin automáticamente,
-eliminando la doble entrada de datos y el riesgo de discrepancias entre lo que ve el cliente en
-Adquierele y lo que queda registrado en Billin.
+Hoy, cuando se genera una factura en Adquierele (ERKIALE) desde una obra, no existe ningún motor de
+facturación electrónica homologado (Veri-Factu/TicketBAI) conectado a la app. Se planteó
+originalmente integrar con Billin (TeamSystem Facturas Billin) vía API para automatizar
+cliente/factura, pero la investigación de mercado mostró que **ningún proveedor SaaS ofrece acceso
+a API por debajo de ~15 €/mes** (Billin Ilimitado: 20 €/mes; BeeL.es Developer: 15,90 €/mes) — el
+presupuesto objetivo de este change es no superar 7 €/mes, lo que descarta la vía SaaS+API.
+
+Alternativa viable dentro de presupuesto: **implementar el cumplimiento VERI*FACTU directamente en
+Adquierele**. La normativa (RD 1007/2023, RRSIF) no exige certificación externa de la AEAT — el
+cumplimiento se acredita con una declaración responsable emitida por el propio productor del
+software. Esto elimina la cuota mensual de un tercero a cambio de implementar correctamente el
+registro de facturación encadenado, firma electrónica, QR y (opcionalmente) el envío a la AEAT.
 
 Este change queda documentado como propuesta a **futuro**: no forma parte de la reestructuración
-actual de catálogo/presupuestos/gastos, y tiene dependencias externas (plan de Billin, comportamiento
-de su API) que deben confirmarse antes de poder estimar o empezar el desarrollo.
+actual de catálogo/presupuestos/gastos, y su dirección preferente (auto-implementación VERI*FACTU
+frente a integración con un proveedor) se detalla en `design.md`, junto con los pendientes de
+validación (idealmente con una asesoría fiscal) antes de poder estimar o empezar el desarrollo.
 
 ## What Changes
 
+**Dirección preferente (Opción B — ver `design.md`):**
+- Adquierele implementa su propio motor de cumplimiento VERI*FACTU: registro de facturación
+  encadenado (hash del registro anterior + UUID), firma electrónica de cada registro, código QR en
+  la factura, y registro de eventos inmutable.
+- Se elige modalidad VERI*FACTU (envío en tiempo real a la AEAT vía su API) o no-VERI*FACTU (cadena
+  local sin envío inmediato).
+- Archivo local de facturas: por cada factura emitida, Adquierele guarda en su propia base de datos
+  los datos completos de la factura, el hash/huella y el QR generados por el propio sistema. Esta
+  pieza no depende de ningún proveedor tercero ni de un límite de clientes.
+- Sin coste recurrente de proveedor externo — el coste es el desarrollo inicial y, recomendado,
+  una validación con asesoría fiscal del diseño técnico antes de ponerlo en producción.
+
+**Alternativa descartada por presupuesto (integración con Billin vía API), documentada por si se
+retoma en el futuro:**
 - Crear/editar/borrar clientes en Billin vía API desde Adquierele, a partir de los datos de cliente
   ya existentes en `Project` (`clientName`, `clientCIF`, `clientAddress`, `clientEmail`,
   `clientPhone`).
-- Enviar/crear facturas en Billin vía API a partir de los `invoiceItems` generados en Adquierele
-  (pantalla de Facturación), en lugar de introducirlos manualmente en el panel de Billin.
-- Integración API directa desde el backend (Firebase Functions), no vía MCP: la lógica de qué
-  cliente crear/borrar y cuándo subir una factura es determinista (reglas de negocio), no requiere
-  que un LLM decida nada en tiempo real.
-- Gestión del límite de 5 "huecos" de cliente en Billin (patrón LRU): Firebase Functions mantiene en
-  Firestore el mapeo cliente-real ↔ hueco-Billin + fecha de último uso; reutiliza el hueco si el
-  cliente ya lo tiene, o libera el hueco usado hace más tiempo (borra ese cliente en Billin, crea el
-  nuevo) si no hay ninguno libre.
-- Archivo local de facturas independiente de Billin: por cada factura enviada, Adquierele guarda en
-  su propia base de datos los datos completos de la factura, el número de factura devuelto por
-  Billin, y el hash/huella + QR de Veri-Factu devueltos por Billin. Este archivo debe sobrevivir
-  aunque el cliente correspondiente sea borrado en Billin por el patrón LRU, ya que la obligación de
-  conservación de registros de facturación recae sobre el emisor (Adquierele/su usuario), no sobre
-  Billin.
-- Es Billin quien genera el número de factura oficial (folio/serie) al recibir los datos vía API,
-  no Adquierele; la respuesta de la API se incorpora al documento que ve el cliente desde Adquierele.
+- Enviar/crear facturas en Billin vía API a partir de los `invoiceItems` generados en Adquierele.
+- Gestión del límite de 5 "huecos" de cliente en Billin (patrón LRU) — necesaria solo si se
+  contratase un plan con límite de clientes.
+- Requiere el plan Ilimitado de Billin (20 €/mes + IVA); el plan Básico (6,6 €/mes) no da acceso a
+  API. Por eso queda descartada frente al presupuesto de ≤7 €/mes.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `billing-integration`: sincronización de clientes y facturas de Adquierele hacia Billin vía API,
-  incluyendo gestión del límite de clientes (LRU) y archivo local de trazabilidad fiscal.
+- `billing-integration`: cumplimiento VERI*FACTU (registro encadenado, firma, QR, archivo local) y,
+  como alternativa documentada, sincronización de clientes/facturas con Billin vía API.
 
 ### Modified Capabilities
 
@@ -49,17 +58,17 @@ pero eso se especificará en el momento de iniciar el desarrollo real)
 
 ## Impact
 
-- Afecta (a futuro): nuevas Firebase Functions (backend), nueva colección Firestore para el mapeo
-  cliente↔hueco-Billin y el archivo local de facturas emitidas, y cambios en
-  `useProjectSubcollections`/`BillingView` para disparar el envío a Billin tras generar/editar una
-  factura.
+- Afecta (a futuro): nuevas Firebase Functions (backend) para generar el registro encadenado,
+  firma y QR; nueva colección Firestore para el archivo local de facturas emitidas y la cadena de
+  hashes; cambios en `useProjectSubcollections`/`BillingView`/`InvoicePreviewModal` para incorporar
+  el QR y los datos de verificación en el documento que ve el cliente.
 - No afecta: estructura actual de `budgetItems`, catálogo jerárquico, calendario, ni gastos.
-- Coste: requiere plan Ilimitado de Billin (20 €/mes + IVA) para acceso a API en producción — el
-  plan Básico (6,6 €/mes) **no** incluye acceso a API (confirmado en la documentación oficial de
-  Billin). El periodo de prueba gratuito de 30 días sí da acceso completo a la API.
-- Riesgo principal: no está confirmado si borrar un cliente en Billin (patrón LRU) desvincula o
-  hace inconsultables desde el panel de Billin las facturas ya emitidas a ese cliente. Esto es
-  bloqueante para el diseño final del patrón LRU y debe resolverse con soporte de Billin antes de
-  implementar.
+- Coste: 0 €/mes de proveedor externo con la Opción B (solo desarrollo inicial); la alternativa de
+  integrar con Billin costaría 20 €/mes + IVA (plan Ilimitado, único con acceso a API), por lo que
+  queda descartada frente al presupuesto de ≤7 €/mes.
+- Riesgo principal: la autodeclaración de cumplimiento VERI*FACTU es responsabilidad propia — un
+  fallo en el encadenado de hashes, la firma o el registro de eventos invalidaría esa declaración.
+  Se recomienda validar el diseño técnico con una asesoría fiscal familiarizada con el RRSIF antes
+  de darlo por operativo.
 - Este change permanece en estado `future`/bloqueado hasta que se resuelvan los "Open Questions" en
   `design.md`. No se debe iniciar implementación (`/opsx:apply`) hasta entonces.
