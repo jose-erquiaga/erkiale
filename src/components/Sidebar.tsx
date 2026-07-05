@@ -9,7 +9,6 @@ import {
   Calendar as CalendarIcon,
   Receipt,
   Ticket,
-  Briefcase,
   LogOut,
   Database,
   Settings,
@@ -116,7 +115,6 @@ export const Sidebar = ({
     {/* Nav */}
     <nav className="flex-1 p-4 space-y-1 mt-2">
       {[
-        { id: 'projects', label: 'Proyectos', icon: Briefcase },
         { id: 'project-calendar', label: 'Calendario Proyecto', icon: CalendarIcon },
         { id: 'budgets', label: 'Presupuesto Activo', icon: FileText },
         { id: 'billing', label: 'Facturación', icon: Receipt },

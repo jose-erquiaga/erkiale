@@ -23,7 +23,6 @@ import { useProjectSubcollections } from './hooks/useProjectSubcollections';
 import { useCompanyExpenses } from './hooks/useCompanyExpenses';
 import { projectColorOf } from './lib/projectColor';
 import { Sidebar } from './components/Sidebar';
-import { ProjectsView } from './components/ProjectsView';
 import { ClientsView } from './components/ClientsView';
 import { ProjectCalendarView } from './components/ProjectCalendarView';
 import { CalendarWidget } from './components/CalendarWidget';
@@ -391,7 +390,6 @@ const App = () => {
               {activeTab === 'expenses' && "Tickets y Gastos"}
               {activeTab === 'company-expenses' && "Gasto Erkiale"}
               {activeTab === 'structure' && "Catálogo"}
-              {activeTab === 'projects' && "Listado Proyectos"}
               {activeTab === 'clients' && "Clientes"}
               {activeTab === 'project-calendar' && "Calendario Proyecto"}
             </h1>
@@ -409,7 +407,7 @@ const App = () => {
             </div>
           </motion.div>
           
-          {(activeTab === 'projects' || activeTab === 'dashboard') && (
+          {activeTab === 'dashboard' && (
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -436,17 +434,6 @@ const App = () => {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.3 }}
             >
-              {activeTab === 'projects' && (
-                <ProjectsView
-                  projects={projects}
-                  selectedProjectId={selectedProjectId}
-                  setSelectedProjectId={setSelectedProjectId}
-                  setActiveTab={setActiveTab}
-                  handleUpdateProjectStatus={handleUpdateProjectStatus}
-                  setDeleteConfirmation={setDeleteConfirmation}
-                />
-              )}
-              
               {activeTab === 'budgets' && (
                 <BudgetView
                   project={selectedProject}
@@ -550,8 +537,11 @@ const App = () => {
                   projects={projects}
                   budgets={budgets}
                   events={events}
+                  selectedProjectId={selectedProjectId}
                   setSelectedProjectId={setSelectedProjectId}
                   setActiveTab={setActiveTab}
+                  handleUpdateProjectStatus={handleUpdateProjectStatus}
+                  setDeleteConfirmation={setDeleteConfirmation}
                 />
               )}
 
