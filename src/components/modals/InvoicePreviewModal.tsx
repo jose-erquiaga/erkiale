@@ -45,12 +45,32 @@ export const InvoicePreviewModal = ({
                 const head = pdoc.head;
                 const meta = pdoc.createElement('meta'); meta.setAttribute('charset', 'UTF-8'); head.appendChild(meta);
                 const title = pdoc.createElement('title'); title.textContent = 'Erkiale'; head.appendChild(title);
-                const tw = pdoc.createElement('script'); tw.src = 'https://cdn.tailwindcss.com'; head.appendChild(tw);
-                const style = pdoc.createElement('style'); style.textContent = '@page{size:A4 portrait;margin:12mm 14mm;}body{font-family:sans-serif;background:white;}'; head.appendChild(style);
+
+                // Reuse the app's own compiled stylesheets instead of an external
+                // CDN so the print output matches the on-screen preview exactly.
+                const styleNodes = document.querySelectorAll('link[rel="stylesheet"], style');
+                const stylesheetsLoaded = Array.from(styleNodes).map(node => {
+                  const clone = node.cloneNode(true) as HTMLLinkElement | HTMLStyleElement;
+                  head.appendChild(clone);
+                  if (clone.tagName === 'LINK') {
+                    return new Promise<void>(resolve => {
+                      clone.addEventListener('load', () => resolve());
+                      clone.addEventListener('error', () => resolve());
+                    });
+                  }
+                  return Promise.resolve();
+                });
+
+                const style = pdoc.createElement('style'); style.textContent = '@page{size:A4 portrait;margin:12mm 14mm;}body{font-family:sans-serif;background:white;}' +
+                  'tr[data-item-row]{page-break-inside:avoid;break-inside:avoid;}' +
+                  'tr[data-group-header]{page-break-after:avoid;break-after:avoid;page-break-inside:avoid;break-inside:avoid;}';
+                head.appendChild(style);
                 pdoc.body.appendChild(content.cloneNode(true));
-                const trigger = pdoc.createElement('script');
-                trigger.textContent = 'window.onload=function(){setTimeout(function(){window.print();},1200);};';
-                pdoc.body.appendChild(trigger);
+
+                Promise.all(stylesheetsLoaded).then(() => {
+                  pw.focus();
+                  pw.print();
+                });
               }} className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase flex items-center gap-2 shadow-lg shadow-blue-100">
                 <FileText size={14}/> Imprimir / PDF
               </button>
@@ -168,14 +188,14 @@ export const InvoicePreviewModal = ({
                     const guildGroups = groupItemsByGuildAndRoom(groupItems);
                     return (
                       <React.Fragment key={group}>
-                        <tr>
+                        <tr data-group-header="true">
                           <td colSpan={5} className="pt-4 pb-1 text-[12px] font-black text-slate-600 uppercase tracking-widest">
                             {group === 'material' ? 'Material' : (isInvoice ? 'Tareas realizadas' : 'Tareas a realizar')}
                           </td>
                         </tr>
                         {guildGroups.map(g => (
                           <React.Fragment key={g.guildName}>
-                            <tr>
+                            <tr data-group-header="true">
                               <td colSpan={5} className="pt-2 pb-1 pl-2 text-[11px] font-black text-blue-600 uppercase tracking-widest">
                                 <div className="flex justify-between">
                                   <span>{g.guildName}</span>
@@ -185,16 +205,16 @@ export const InvoicePreviewModal = ({
                             </tr>
                             {g.rooms.map(r => (
                               <React.Fragment key={r.roomName}>
-                                <tr>
+                                <tr data-group-header="true">
                                   <td colSpan={5} className="pb-1 pl-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">{r.roomName}</td>
                                 </tr>
                                 {r.subcategories.map(s => (
                                   <React.Fragment key={s.subcategoryName}>
-                                    <tr>
+                                    <tr data-group-header="true">
                                       <td colSpan={5} className="pb-1 pl-6 text-[9px] font-black text-slate-500 uppercase tracking-widest">{s.subcategoryName}</td>
                                     </tr>
                                     {s.items.map(item => (
-                                      <tr key={item.id} className="border-b border-slate-100">
+                                      <tr key={item.id} className="border-b border-slate-100" data-item-row="true">
                                         <td className="py-4 pr-4 pl-6">
                                           <p className="text-[9px] font-medium text-slate-900">{item.concept}</p>
                                           {item.description && (
