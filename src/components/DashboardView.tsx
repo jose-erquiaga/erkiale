@@ -38,8 +38,11 @@ export const DashboardView = ({
 
   const filteredProjects = projects.filter(p => p.status === statusFilter);
 
-  const goToProject = (projectId?: string) => {
-    if (!projectId) return;
+  const goToEvent = (projectId: string) => {
+    if (projectId === 'erkiale') {
+      setActiveTab('global-calendar');
+      return;
+    }
     setSelectedProjectId(projectId);
     setActiveTab('project-calendar');
   };
@@ -92,7 +95,7 @@ export const DashboardView = ({
               return (
                 <button
                   key={ev.firebaseId || ev.id}
-                  onClick={() => goToProject(project?.firebaseId)}
+                  onClick={() => goToEvent(ev.projectId)}
                   className="w-full flex items-center justify-between p-4 rounded-2xl bg-rose-50/60 hover:bg-rose-50 transition-colors text-left"
                 >
                   <div>
@@ -145,7 +148,7 @@ export const DashboardView = ({
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.4, delay: idx * 0.05 }}
-                  onClick={() => goToProject(project.firebaseId)}
+                  onClick={() => project.firebaseId && goToEvent(project.firebaseId)}
                   className="group bg-white rounded-[2.5rem] border transition-all duration-500 p-8 flex flex-col justify-between cursor-pointer hover:shadow-2xl hover:-translate-y-2"
                   style={{
                     borderColor: isSelected ? projColor : '#f1f5f9',
