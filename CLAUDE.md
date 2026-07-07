@@ -17,15 +17,16 @@
 ```
 src/
 ├── components/
-│   ├── BudgetView.tsx          # Pantalla de Presupuesto (desglose + add partidas)
-│   ├── BillingView.tsx         # Pantalla de Facturación (invoice items + empresa)
-│   ├── CalendarWidget.tsx      # Calendario Gantt-style (planificación/reuniones)
-│   ├── Dashboard.tsx           # Landing / resumen proyectos
-│   ├── ProjectView.tsx         # Gestión de proyecto + pestañas
-│   ├── ExpenseView.tsx         # Gastos ejecutados
+│   ├── BudgetView.tsx                    # Pantalla de Presupuesto (desglose + add partidas)
+│   ├── BillingView.tsx                   # Pantalla de Facturación (invoice items + empresa)
+│   ├── CalendarWidget.tsx                # Calendario Gantt-style (planificación/reuniones)
+│   ├── Dashboard.tsx                     # Landing / resumen proyectos
+│   ├── ProjectView.tsx                   # Gestión de proyecto + pestañas
+│   ├── ExpensesView.tsx                  # Gastos ejecutados + captura de facturas
+│   ├── CameraReceiptCapture.tsx          # Modal: captura foto → Gemini Vision → extrae items
 │   └── modals/
-│       ├── InvoicePreviewModal.tsx  # PDF/preview compartido Presupuesto + Factura
-│       └── ProjectModal.tsx     # Crear/editar proyectos
+│       ├── InvoicePreviewModal.tsx       # PDF/preview compartido Presupuesto + Factura
+│       └── ProjectModal.tsx              # Crear/editar proyectos
 ├── hooks/
 │   ├── useProjectSubcollections.ts  # CRUD: presupuestos, facturas, gastos
 │   ├── useCatalogHierarchy.ts       # Catálogo jerárquico (gremios/estancias/subcategorías)
@@ -174,6 +175,50 @@ Gasto ejecutado (factura proveedor, ticket, nómina, etc.).
 
 **Patrón:** Idéntico a BudgetView en agrupación jerárquica.
 
+### ExpensesView.tsx
+**Rol:** Pantalla de Gastos del Proyecto. Muestra tabla de gastos registrados (material/trabajo), con botón de "Capturar Factura" que abre modal de captura + análisis con Gemini Vision.
+
+**Props:**
+- `project`, `selectedProjectId`, `expenses`: estado de gastos
+- `handleSaveExpense`: callback para agregar nuevo gasto
+- `isScanningExpense`, `expenseScanError`: estado de escaneo
+- `handleExpenseScan`: handler heredado (deprecated, reemplazado por CameraReceiptCapture)
+
+**Integración con CameraReceiptCapture:**
+- Botón "Capturar Factura" abre modal
+- Cuando se extraen items, auto-rellena el formulario de gastos a la derecha
+- Usuario puede confirmar los datos extraídos o editarlos antes de guardar
+
+### CameraReceiptCapture.tsx
+**Rol:** Modal reutilizable para capturar fotos de facturas y extraer items automáticamente usando Gemini Vision API.
+
+**Características:**
+- Captura en tiempo real desde cámara del dispositivo (entorno trasero)
+- Subida manual de archivos de imagen
+- Llamada a Cloud Function que envía imagen a Gemini Vision API
+- Extrae: concepto, cantidad, precio unitario, IVA por ítem
+- Muestra resultados con total de factura y desglose de IVA
+- Botón "Agregar a Gastos" para cada ítem
+
+**Props:**
+- `isOpen`: controla visibilidad del modal
+- `onClose`: callback al cerrar
+- `onItemsExtracted`: callback cuando se extraen items (recibe array de items)
+
+**Estados internos:**
+- `isCameraActive`: si la cámara está activa
+- `isProcessing`: mientras se procesa con Gemini
+- `extractedData`: datos extraídos de la factura
+- `error`: mensajes de error
+
+**Flujo:**
+1. Usuario hace clic en "Capturar Factura"
+2. Elige entre "Usar Cámara" o "Subir Archivo"
+3. Captura/selecciona foto
+4. Componente envía a Cloud Function con imagen en base64
+5. Gemini Vision extrae items y totales
+6. Muestra resultado con opción de agregar cada ítem a gastos
+
 ### InvoicePreviewModal.tsx
 **Rol:** Modal compartido para PDF/preview de **Presupuesto** y **Factura**. Se abre desde BudgetView ("Vista Previa Presupuesto") o BillingView ("Vista Previa & PDF"), detectando `activeTab` para saber si es presupuesto (`activeTab !== 'billing'`) o factura (`activeTab === 'billing'`).
 
@@ -316,6 +361,119 @@ Manejadas por `useProjectSubcollections` (ver Hooks).
 
 ---
 
+## Captura de Facturas y Análisis con Gemini Vision
+
+### Arquitectura General
+
+**Flujo end-to-end:**
+1. Usuario captura foto de factura desde ExpensesView → modal CameraReceiptCapture
+2. Imagen se convierte a base64 en el navegador
+3. Se envía a Cloud Function (endpoint HTTP autenticado)
+4. Cloud Function recupera API key de Gemini desde Secret Manager
+5. Gemini Vision API analiza imagen y extrae items, precios, IVA
+6. Respuesta se retorna al navegador
+7. Items se muestran en modal con opción de agregar a gastos
+
+### Google Cloud Deployment
+
+**Cloud Function: `analyzeReceipt`**
+- Ubicación: `europe-west1`
+- Runtime: Node.js 20 (2nd gen)
+- Endpoint HTTP: `https://europe-west1-erkiale-9459d.cloudfunctions.net/analyzeReceipt`
+- Entry point: `app` (Express.js)
+- Autenticación: `--allow-unauthenticated` (cualquier usuario puede llamar)
+
+**Dependencias:**
+- `@google-cloud/functions-framework`: wrapper para Cloud Functions v2
+- `@google-cloud/secret-manager`: acceder a Secret Manager
+- `express`: framework HTTP
+- `cors`: permitir requests cross-origin
+- `axios`: hacer requests HTTP a Gemini API
+
+**Lógica:**
+```
+POST /analyzeReceipt
+{imageBase64: "..."}
+  ↓
+Recupera API key desde Secret Manager
+  ↓
+Llama Gemini Vision API con imagen
+  ↓
+Parsea JSON de respuesta (regex: /\{[\s\S]*\}/)
+  ↓
+Retorna {items: [...], totalBase, totalIVA, totalFactura}
+```
+
+**Respuesta esperada:**
+```typescript
+{
+  items: [
+    {
+      concepto: string,
+      cantidad: number,
+      precioUnitario: number,
+      iva?: number,
+      total?: number
+    }
+  ],
+  totalBase?: number,
+  totalIVA?: number,
+  totalFactura?: number
+}
+```
+
+### Secret Manager
+
+**Secret:** `gemini-api-key`
+- Proyecto: `erkiale-9459d`
+- Almacena API key de Google AI Studio (Gemini API)
+- Acceso restringido a service account de Cloud Function
+- Nunca expuesta en código fuente
+
+### Flujo de Procesamiento en Frontend
+
+**CameraReceiptCapture.tsx:**
+
+1. **Captura de imagen:**
+   - Canvas API para capturar desde video stream
+   - FileReader para leer archivos subidos
+   - Conversión a base64 JPEG
+
+2. **Envío a Cloud Function:**
+```typescript
+fetch(GEMINI_API_URL, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ imageBase64: base64Data })
+})
+```
+
+3. **Procesamiento de respuesta:**
+   - Valida que la respuesta sea JSON
+   - Extrae campos: items, totalBase, totalIVA, totalFactura
+   - Muestra error si Gemini no pudo procesar
+
+4. **Auto-relleno de formulario:**
+   - ExpensesView recibe array de items
+   - Llena campos del formulario: concepto, proveedor, precio, IVA
+   - Usuario puede editar antes de guardar
+
+### Prompts de Gemini Vision
+
+**Actual:**
+```
+"Extrae de esta factura: items (concepto, cantidad, precio unitario, IVA). 
+Retorna SOLO JSON: {items: [{concepto, cantidad, precioUnitario, iva}], totalBase, totalIVA, totalFactura}"
+```
+
+Puede mejorarse según tipo de factura:
+- Facturas europeas (IRPF, etc.)
+- Tickets de tienda
+- Nóminas
+- Presupuestos de terceros
+
+---
+
 ## Hooks Personalizados
 
 ### useProjectSubcollections.ts
@@ -375,12 +533,46 @@ En BudgetView, inputs `type="number"` con `onFocus={e => e.target.select()}` evi
 ---
 
 ## Próximos Pasos / Roadmap
-- Exportar presupuesto a Excel/CSV.
-- Mejorar tabla de gastos (filtros, búsqueda).
-- Notificaciones de eventos próximos.
-- Soporte multi-usuario/equipos.
-- Historial de versiones de presupuestos.
+
+### Completado ✅
+- Captura de facturas con cámara + Gemini Vision
+- Extracción automática de items, precios e IVA
+- Auto-relleno de formulario de gastos
+
+### Corto plazo
+- Agregar items capturados opcionalmente al catálogo jerárquico (Gremio/Estancia/Subcategoría selector)
+- Validación de formato de factura antes de enviar a Gemini (evitar fotos borrosas)
+- Cacheo de resultados por hash de imagen (evitar duplicados)
+- Soporte para múltiples idiomas en prompts de Gemini
+
+### Mediano plazo
+- Exportar presupuesto/factura a Excel/CSV
+- Mejorar tabla de gastos (filtros, búsqueda, sorting)
+- Notificaciones de eventos próximos
+- Soporte multi-usuario/equipos
+- Historial de versiones de presupuestos
+
+### Largo plazo
+- OCR mejorado para documentos más complejos (nóminas, IVA desglosado)
+- Integración con proveedores (APIs de bancos, contabilidad)
+- IA para predicción de costos/tiempos
+- Mobile app nativa
 
 ---
 
-**Última actualización:** Rondas recientes (Gremio agrupación, jerarquía tipográfica, textos "Tareas realizadas").
+## Notas de Implementación Recientes
+
+### Migración de cuenta (julio 2026)
+- Proyecto GCP trasladado de `jose.erquiaga@gmail.com` a `erkialesl@gmail.com`
+- Firestore exportado y datos migrantes (Secret Manager + backup temporal en GCS)
+- Firebase Hosting redeployed bajo nueva cuenta
+
+### Arquitectura Gemini Vision (julio 2026)
+- Cloud Function v2 (Node.js 20) como proxy seguro para API key
+- API key almacenada en Secret Manager (nunca en código)
+- Frontend envía imágenes en base64, backend gestiona autenticación
+- CORS habilitado para requests desde navegador
+
+---
+
+**Última actualización:** Julio 2026 (Captura de facturas con Gemini Vision + migración de cuenta).
