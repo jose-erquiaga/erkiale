@@ -1,5 +1,3 @@
-import { GoogleGenAI, Type } from "@google/genai";
-
 export interface ScannedExpenseComponent {
   concept: string;
   quantity: number;
@@ -13,92 +11,48 @@ export interface ScannedExpenseDocument {
   components: ScannedExpenseComponent[];
 }
 
-const API_KEY = process.env.GEMINI_API_KEY;
-const MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+// Cloud Function proxy: keeps the Gemini API key in Secret Manager instead
+// of shipping it inside the client bundle (Vite `define` would otherwise
+// expose it to anyone who opens devtools).
+const ANALYZE_RECEIPT_URL = 'https://europe-west1-erkiale-9459d.cloudfunctions.net/analyzeReceipt';
 
-const isQuotaError = (error: unknown): boolean => {
-  const msg = error instanceof Error ? error.message : String(error);
-  return msg.includes('429') || msg.toLowerCase().includes('quota');
-};
-
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-async function callGemini(file: File, prompt: string, schema: object): Promise<any> {
-  if (!API_KEY) {
-    throw new Error("GEMINI_API_KEY no está configurada.");
-  }
-
-  const ai = new GoogleGenAI({ apiKey: API_KEY });
-
+const fileToBase64 = (file: File): Promise<string> => {
   const reader = new FileReader();
-  const base64Promise = new Promise<string>((resolve) => {
+  const promise = new Promise<string>((resolve, reject) => {
     reader.onload = () => resolve((reader.result as string).split(',')[1]);
+    reader.onerror = () => reject(reader.error);
   });
   reader.readAsDataURL(file);
-  const base64Data = await base64Promise;
-
-  // Retries absorb transient per-minute rate-limit spikes; a fully
-  // exhausted free-tier quota still surfaces to the caller after these.
-  const retryDelaysMs = [2000, 5000];
-  for (let attempt = 0; attempt <= retryDelaysMs.length; attempt++) {
-    try {
-      const response = await ai.models.generateContent({
-        model: MODEL,
-        contents: [
-          {
-            parts: [
-              { text: prompt },
-              { inlineData: { data: base64Data, mimeType: file.type } }
-            ]
-          }
-        ],
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: schema
-        }
-      });
-
-      return JSON.parse(response.text);
-    } catch (error) {
-      if (!isQuotaError(error) || attempt === retryDelaysMs.length) {
-        throw error;
-      }
-      await sleep(retryDelaysMs[attempt]);
-    }
-  }
-}
+  return promise;
+};
 
 // Extracts a single invoice/receipt as one provider + one date + every
 // individual line-item component with its own quantity/unit price, so the
 // user can review and correct each component before it becomes an expense.
 export const scanExpenseInvoice = async (file: File): Promise<ScannedExpenseDocument> => {
-  const prompt = "Extract this single invoice/receipt: it has one provider (issuing company/store name) " +
-    "and one date. Return EVERY distinct line-item/component separately, each with its own concept " +
-    "(what was bought), quantity (assume 1 if not stated), unit price, and line total (price). " +
-    "Do NOT collapse multiple lines into a single total. Ignore summary rows like subtotal, IVA, or " +
-    "grand total — those are derived from the components, not components themselves.";
+  const imageBase64 = await fileToBase64(file);
 
-  const schema = {
-    type: Type.OBJECT,
-    properties: {
-      provider: { type: Type.STRING },
-      date: { type: Type.STRING, description: "YYYY-MM-DD" },
-      components: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            concept: { type: Type.STRING },
-            quantity: { type: Type.NUMBER },
-            unitPrice: { type: Type.NUMBER },
-            price: { type: Type.NUMBER }
-          },
-          required: ["concept", "price"]
-        }
-      }
-    },
-    required: ["provider", "date", "components"]
+  const response = await fetch(ANALYZE_RECEIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ imageBase64, mimeType: file.type }),
+  });
+
+  if (!response.ok) {
+    if (response.status === 429) {
+      throw new Error('429: Cuota de IA agotada.');
+    }
+    throw new Error(`Error al analizar la factura: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  if (data.error) {
+    throw new Error(data.error);
+  }
+
+  return {
+    provider: data.provider || '',
+    date: data.date || '',
+    components: Array.isArray(data.components) ? data.components : [],
   };
-
-  return callGemini(file, prompt, schema);
 };
