@@ -1,6 +1,7 @@
 import React from 'react';
 import { Camera, Hammer, X, ChevronDown } from 'lucide-react';
 import type { Project, ExpenseItem } from '../types';
+import { CameraReceiptCapture } from './CameraReceiptCapture';
 
 interface ExpensesViewProps {
   project: Project;
@@ -43,6 +44,8 @@ export const ExpensesView = ({
   if (!project) return <div className="p-12 text-center text-slate-400 italic">No hay ningún proyecto seleccionado. Crea uno para empezar.</div>;
   const projectExpenses = expenses[selectedProjectId] ?? [];
   const [tipo, setTipo] = React.useState<'material' | 'trabajo'>('material');
+  const [showCameraModal, setShowCameraModal] = React.useState(false);
+  const [extractedItems, setExtractedItems] = React.useState<{concepto: string; cantidad: number; precioUnitario: number; iva?: number} | null>(null);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -50,29 +53,13 @@ export const ExpensesView = ({
         <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl overflow-hidden">
           <div className="px-8 py-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
             <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest">Gastos Registrados</h4>
-            <div className="flex gap-2">
-              <label className={`flex items-center gap-2 text-[10px] font-black cursor-pointer px-5 py-3 rounded-xl transition-all uppercase tracking-widest shadow-lg shadow-blue-100 ${isScanningExpense ? 'bg-blue-300 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
-                {isScanningExpense ? "Procesando..." : <><Camera size={16} /> Tomar Foto</>}
-                <input
-                  type="file"
-                  className="hidden"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={handleExpenseScan}
-                  disabled={isScanningExpense}
-                />
-              </label>
-              <label className={`flex items-center gap-2 text-[10px] font-black cursor-pointer px-4 py-3 rounded-xl transition-all uppercase tracking-widest border border-blue-100 ${isScanningExpense ? 'bg-blue-100' : 'bg-blue-50 text-blue-600'}`}>
-                Subir Archivo
-                <input
-                  type="file"
-                  className="hidden"
-                  accept="image/*,application/pdf"
-                  onChange={handleExpenseScan}
-                  disabled={isScanningExpense}
-                />
-              </label>
-            </div>
+            <button
+              onClick={() => setShowCameraModal(true)}
+              className={`flex items-center gap-2 text-[10px] font-black px-5 py-3 rounded-xl transition-all uppercase tracking-widest shadow-lg shadow-blue-100 ${isScanningExpense ? 'bg-blue-300 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+              disabled={isScanningExpense}
+            >
+              <Camera size={16} /> Capturar Factura
+            </button>
           </div>
 
           {expenseScanError && (
@@ -160,6 +147,30 @@ export const ExpensesView = ({
           <button type="submit" className="w-full bg-slate-900 text-white p-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl">Añadir Gasto</button>
         </form>
       </div>
+
+      <CameraReceiptCapture
+        isOpen={showCameraModal}
+        onClose={() => setShowCameraModal(false)}
+        onItemsExtracted={(items) => {
+          if (items.length > 0) {
+            const item = items[0];
+            setExtractedItems(item);
+            setShowCameraModal(false);
+            // Auto-fill the form with extracted data
+            const form = document.querySelector('form') as HTMLFormElement;
+            if (form) {
+              form.concept.value = item.concepto;
+              form.provider.value = 'Factura escaneada';
+              if (tipo === 'material') {
+                form.base.value = item.precioUnitario.toString();
+                form.iva.value = (item.iva || 0).toString();
+              } else {
+                form.amount.value = item.precioUnitario.toString();
+              }
+            }
+          }
+        }}
+      />
     </div>
   );
 };
