@@ -42,17 +42,46 @@ export const CameraReceiptCapture: React.FC<CameraReceiptCaptureProps> = ({
   const startCamera = async () => {
     try {
       setError(null);
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
-        audio: false,
-      });
+
+      // Primero intenta cámara trasera (móvil), luego frontal (PC)
+      let stream: MediaStream | null = null;
+
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' } },
+          audio: false,
+        });
+      } catch {
+        // Si falla, intenta con cámara frontal
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user' },
+          audio: false,
+        });
+      }
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play().catch(err => {
+            console.error('Error al reproducir video:', err);
+            setError('No se pudo reproducir el video de la cámara.');
+          });
+        };
         setIsCameraActive(true);
       }
     } catch (err) {
-      setError('No se pudo acceder a la cámara. Por favor, verifica los permisos.');
-      console.error(err);
+      const errorMsg = err instanceof Error ? err.message : 'Desconocido';
+      console.error('Error al acceder a cámara:', err);
+
+      if (errorMsg.includes('NotAllowedError')) {
+        setError('Permiso de cámara denegado. Por favor, habilita el acceso en configuración del navegador.');
+      } else if (errorMsg.includes('NotFoundError')) {
+        setError('No se encontró ninguna cámara en este dispositivo.');
+      } else if (errorMsg.includes('NotReadableError')) {
+        setError('La cámara está siendo usada por otra aplicación.');
+      } else {
+        setError(`No se pudo acceder a la cámara: ${errorMsg}`);
+      }
     }
   };
 
@@ -134,6 +163,9 @@ export const CameraReceiptCapture: React.FC<CameraReceiptCaptureProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      {/* Canvas oculto para captura */}
+      <canvas ref={canvasRef} className="hidden" />
+
       <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
         {/* Header */}
         <div className="sticky top-0 bg-blue-600 px-8 py-6 flex justify-between items-center">
@@ -176,29 +208,35 @@ export const CameraReceiptCapture: React.FC<CameraReceiptCaptureProps> = ({
 
           {/* Upload buttons */}
           {!isCameraActive && !extractedData && (
-            <div className="grid grid-cols-2 gap-4">
-              <button
-                onClick={startCamera}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl flex flex-col items-center gap-2"
-              >
-                <Camera size={24} />
-                Usar Cámara
-              </button>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="bg-slate-200 hover:bg-slate-300 text-slate-900 font-black py-4 rounded-xl flex flex-col items-center gap-2"
-              >
-                <Plus size={24} />
-                Subir Archivo
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleFileUpload}
-              />
-            </div>
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={startCamera}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl flex flex-col items-center gap-2"
+                >
+                  <Camera size={24} />
+                  Usar Cámara
+                </button>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="bg-slate-200 hover:bg-slate-300 text-slate-900 font-black py-4 rounded-xl flex flex-col items-center gap-2"
+                >
+                  <Plus size={24} />
+                  Subir Archivo
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileUpload}
+                  capture="environment"
+                />
+              </div>
+              <p className="text-xs text-slate-500 text-center">
+                💡 Si la cámara no funciona, usa "Subir Archivo" para seleccionar una foto
+              </p>
+            </>
           )}
 
           {/* Processing */}
