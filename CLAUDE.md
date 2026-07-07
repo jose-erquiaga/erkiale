@@ -17,19 +17,23 @@
 ```
 src/
 ├── components/
-│   ├── BudgetView.tsx          # Pantalla de Presupuesto (desglose + add partidas)
-│   ├── BillingView.tsx         # Pantalla de Facturación (invoice items + empresa)
-│   ├── CalendarWidget.tsx      # Calendario Gantt-style (planificación/reuniones)
-│   ├── Dashboard.tsx           # Landing / resumen proyectos
-│   ├── ProjectView.tsx         # Gestión de proyecto + pestañas
-│   ├── ExpenseView.tsx         # Gastos ejecutados
+│   ├── BudgetView.tsx               # Pantalla de Presupuesto (desglose + add partidas)
+│   ├── BillingView.tsx              # Pantalla de Facturación (invoice items + empresa)
+│   ├── CalendarWidget.tsx           # Calendario Gantt-style (planificación/reuniones)
+│   ├── DashboardView.tsx            # Landing / resumen proyectos
+│   ├── ExpensesView.tsx             # Gastos ejecutados de proyecto + escaneo de facturas
+│   ├── CompanyExpensesView.tsx      # Gastos ejecutados de la empresa + escaneo de facturas
 │   └── modals/
-│       ├── InvoicePreviewModal.tsx  # PDF/preview compartido Presupuesto + Factura
-│       └── ProjectModal.tsx     # Crear/editar proyectos
+│       ├── InvoicePreviewModal.tsx        # PDF/preview compartido Presupuesto + Factura
+│       ├── ScannedExpensePreviewModal.tsx # Revisión de factura escaneada antes de guardar
+│       └── ProjectModal.tsx               # Crear/editar proyectos
 ├── hooks/
-│   ├── useProjectSubcollections.ts  # CRUD: presupuestos, facturas, gastos
+│   ├── useProjectSubcollections.ts  # CRUD: presupuestos, facturas, gastos (incl. handleExpenseScan)
+│   ├── useCompanyExpenses.ts        # CRUD: gastos de empresa (incl. handleExpenseScan)
 │   ├── useCatalogHierarchy.ts       # Catálogo jerárquico (gremios/estancias/subcategorías)
 │   └── ...otros hooks
+├── services/
+│   └── geminiService.ts         # scanExpenseInvoice(): llama a Cloud Function analyzeReceipt
 ├── lib/
 │   ├── groupBudgetItems.ts      # Helper: agrupa ítems por Gremio/Estancia/Subcategoría
 │   ├── firebase.ts              # Config Firebase + operaciones base
@@ -37,9 +41,11 @@ src/
 ├── types/
 │   ├── index.ts                 # Interfaces principales (Project, BudgetItem, etc)
 │   └── catalogHierarchy.ts      # Tipos del catálogo
-├── styles/
-│   └── ...estilos globales
 └── App.tsx                      # Router principal + estado global
+
+functions/
+├── index.js       # Cloud Function `analyzeReceipt`: proxy seguro a Gemini Vision (Secret Manager)
+└── package.json
 ```
 
 ---
@@ -196,6 +202,14 @@ Gasto ejecutado (factura proveedor, ticket, nómina, etc.).
 - Si `isInvoice`: título "Tareas realizadas", presupuesto "Tareas a realizar".
 - Colores Gremio: azul en PDF (igual en presupuesto y factura; en pantalla facturación es verde, pero PDF siempre azul para coherencia visual).
 
+### ExpensesView.tsx / CompanyExpensesView.tsx
+**Rol:** Gastos ejecutados de un proyecto (`ExpensesView`) o de la empresa (`CompanyExpensesView`). Tabla de gastos + formulario manual + botón de escaneo de factura ("Tomar Foto" / "Subir Archivo") que dispara `handleExpenseScan`.
+
+**Flujo de escaneo:** ver sección "Escaneo de Facturas con Gemini Vision" más abajo. El resultado se revisa en `ScannedExpensePreviewModal` antes de guardarse como `ExpenseItem`(s).
+
+### ScannedExpensePreviewModal.tsx
+**Rol:** Modal de revisión tras escanear una factura con Gemini. Muestra proveedor, fecha, y cada componente/línea detectado (editable) antes de confirmar el guardado. Se usa tanto desde `ExpensesView` como desde `CompanyExpensesView` (mismo componente, distinto hook de origen).
+
 ---
 
 ## Helpers y Utilities
@@ -316,6 +330,54 @@ Manejadas por `useProjectSubcollections` (ver Hooks).
 
 ---
 
+## Escaneo de Facturas con Gemini Vision
+
+### Flujo end-to-end
+1. Usuario sube foto/archivo de factura desde `ExpensesView` (gastos de proyecto) o `CompanyExpensesView` (gastos de Erkiale), mediante el input con `handleExpenseScan`.
+2. `handleExpenseScan` (en `useProjectSubcollections.ts` / `useCompanyExpenses.ts`) llama a `scanExpenseInvoice(file)` de `src/services/geminiService.ts`.
+3. `scanExpenseInvoice` convierte el archivo a base64 y llama a la **Cloud Function `analyzeReceipt`** (no llama a Gemini directamente desde el cliente).
+4. La Cloud Function recupera la API key de Gemini desde **Secret Manager** (nunca se expone en el bundle del cliente) y llama a Gemini Vision.
+5. Gemini devuelve `{provider, date, components: [{concept, quantity, unitPrice, price}]}`.
+6. El resultado se guarda en `scannedExpensePreview` (estado del hook) y se muestra en `ScannedExpensePreviewModal.tsx` para que el usuario revise/corrija cada componente antes de confirmar.
+7. Al confirmar (`handleConfirmScannedExpense`), cada componente se guarda como un `ExpenseItem` independiente en Firestore.
+
+### Por qué Cloud Function y no llamada directa desde el cliente
+Antes, `geminiService.ts` instanciaba `GoogleGenAI` con una API key inyectada vía `vite.config.ts` (`process.env.GEMINI_API_KEY`) — esto la exponía en el bundle JS, visible para cualquiera en devtools. Se migró a un proxy server-side:
+- **Cloud Function `analyzeReceipt`** (`functions/index.js`), Node.js 20, 2ª gen, región `europe-west1`.
+- Endpoint: `https://europe-west1-erkiale-9459d.cloudfunctions.net/analyzeReceipt`
+- La API key vive en Secret Manager (`gemini-api-key`, proyecto `erkiale-9459d`), solo accesible por la service account de la función.
+- El cliente nunca ve la key; solo envía `{imageBase64, mimeType}` y recibe el JSON estructurado.
+
+### geminiService.ts
+**Contrato (sin cambios respecto al diseño original, solo cambió la implementación interna):**
+```typescript
+interface ScannedExpenseDocument {
+  provider: string;
+  date: string;
+  components: { concept: string; quantity: number; unitPrice: number; price: number }[];
+}
+scanExpenseInvoice(file: File): Promise<ScannedExpenseDocument>
+```
+Esto permite que los hooks (`useProjectSubcollections`, `useCompanyExpenses`) y el modal de preview no necesiten saber si el análisis ocurre en el cliente o en un backend.
+
+### functions/index.js (Cloud Function)
+- Usa `@google-cloud/functions-framework` (requerido en Cloud Functions v2/gen2; exportar un Express app directamente sin registrar con `functions.http()` falla el healthcheck).
+- Usa `@google-cloud/secret-manager` para leer la API key.
+- Prompt idéntico al usado anteriormente en el cliente (extrae proveedor + fecha + cada línea de la factura, ignorando subtotales/IVA/gran total como líneas).
+- Deploy:
+```bash
+gcloud functions deploy analyzeReceipt \
+  --runtime nodejs20 \
+  --trigger-http \
+  --allow-unauthenticated \
+  --entry-point=app \
+  --source=functions \
+  --project=erkiale-9459d \
+  --region=europe-west1
+```
+
+---
+
 ## Hooks Personalizados
 
 ### useProjectSubcollections.ts
@@ -375,6 +437,12 @@ En BudgetView, inputs `type="number"` con `onFocus={e => e.target.select()}` evi
 ---
 
 ## Próximos Pasos / Roadmap
+
+### Completado
+- Escaneo de facturas con Gemini Vision (proxy vía Cloud Function + Secret Manager, sin exponer API key en cliente).
+
+### Pendiente
+- Opción de agregar ítems escaneados directamente al catálogo jerárquico (selector Gremio/Estancia/Subcategoría con precio/unidades prerellenados).
 - Exportar presupuesto a Excel/CSV.
 - Mejorar tabla de gastos (filtros, búsqueda).
 - Notificaciones de eventos próximos.
@@ -383,4 +451,4 @@ En BudgetView, inputs `type="number"` con `onFocus={e => e.target.select()}` evi
 
 ---
 
-**Última actualización:** Rondas recientes (Gremio agrupación, jerarquía tipográfica, textos "Tareas realizadas").
+**Última actualización:** Migración de cuenta a `erkialesl@gmail.com` + escaneo de facturas movido a Cloud Function segura (Secret Manager) en vez de API key expuesta en cliente.

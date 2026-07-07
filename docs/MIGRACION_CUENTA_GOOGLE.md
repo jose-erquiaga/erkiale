@@ -2,6 +2,8 @@
 
 Guía para mover la app (Firebase + Gemini) a otra cuenta de Google. Cubre qué se hace desde la consola de Google (fuera del código) y qué archivos del repo hay que tocar.
 
+> **Julio 2026:** Ya se ejecutó una migración real, proyecto `erkiale-9459d` de `jose.erquiaga@gmail.com` a `erkialesl@gmail.com`, usando la **Opción A** (mismo proyecto, nuevo propietario vía IAM). No se creó proyecto nuevo ni se tocó `firebase-applet-config.json`.
+
 ## 1. Firebase (proyecto)
 
 El proyecto actual es `erkiale-9459d` (ver `firebase-applet-config.json`). Dos opciones:
@@ -35,11 +37,16 @@ firebase deploy --only firestore:rules
 
 ## 4. Gemini API key (reconocimiento de facturas)
 
-`GEMINI_API_KEY` (usada por `src/services/geminiService.ts` para el OCR de facturas) es independiente de Firebase — se genera en Google AI Studio y pertenece a un proyecto de Google Cloud.
+El OCR de facturas (`src/services/geminiService.ts` → `scanExpenseInvoice`) **ya no llama a Gemini directamente desde el cliente**. Llama a una Cloud Function (`analyzeReceipt`) que recupera la API key desde Secret Manager server-side, así la key nunca se expone en el bundle del navegador.
 
-- Genera una key nueva en [aistudio.google.com](https://aistudio.google.com/) con la cuenta nueva.
-- Actualiza `.env.local` en local (no se commitea, está en `.gitignore`).
-- Actualiza la variable de entorno en el entorno de build/CI de producción, ya que se inyecta en el bundle en build-time (`vite.config.ts`).
+- La key vive en Secret Manager como secret `gemini-api-key`, en el proyecto `erkiale-9459d`.
+- Para regenerarla con la cuenta nueva: crea una key nueva en [aistudio.google.com](https://aistudio.google.com/) con la cuenta nueva, y actualiza el secret:
+  ```bash
+  echo -n "NUEVA_API_KEY" | gcloud secrets versions add gemini-api-key \
+    --data-file=- --project=erkiale-9459d
+  ```
+- No hace falta tocar `.env.local` ni `vite.config.ts` — la key no pasa por el build del frontend.
+- Si migras a un proyecto GCP nuevo (Opción B), hay que recrear el secret ahí y volver a desplegar la Cloud Function (ver `CLAUDE.md`, sección "Escaneo de Facturas con Gemini Vision").
 
 ## 5. Hosting
 
@@ -57,6 +64,6 @@ Con proyecto nuevo, usa el ID nuevo en ese comando. Si hay dominio propio config
 - [ ] Si Opción B: reemplazar `firebase-applet-config.json`
 - [ ] Actualizar emails en `src/lib/firebase.ts` (`isAdmin`)
 - [ ] Actualizar emails en `firestore.rules` (`isSignedIn`, `isAdmin`) y desplegar rules
-- [ ] Generar `GEMINI_API_KEY` nueva y actualizarla en `.env.local` / entorno de build
+- [ ] Generar API key de Gemini nueva y actualizar el secret `gemini-api-key` en Secret Manager (`gcloud secrets versions add`)
 - [ ] Desplegar hosting con `firebase deploy --project <project-id>`
 - [ ] Verificar dominio propio (si aplica)
