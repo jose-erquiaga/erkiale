@@ -34,7 +34,9 @@ const PROMPT =
   'Respond with ONLY a JSON object: {"provider": string, "date": "YYYY-MM-DD", ' +
   '"components": [{"concept": string, "quantity": number, "unitPrice": number, "price": number}]}';
 
-app.post('/analyzeReceipt', async (req, res) => {
+// Cloud Functions v2 forwards the request to the container root ("/"),
+// not to a path matching the function name in the cloudfunctions.net URL.
+app.post('/', async (req, res) => {
   try {
     const { imageBase64, mimeType } = req.body;
     if (!imageBase64) {
